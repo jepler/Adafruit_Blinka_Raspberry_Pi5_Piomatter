@@ -1,15 +1,15 @@
 ; data format (out-shift-right):
 ; MSB ... LSB
-; 0 ddd........ddd: 31-bit delay
-; 1 ppp....ppp ddd: 28 bit data + 3-bit delay
+; 0 dddd.......ddd: 31-bit delay
+; 1 dddd ppp...ppp: 28 bit data + 3-bit delay
 
 .wrap_target
 top:
     ; pull ;; use auto-pull
     out x, 1
     jmp !x do_delay
-    out pins, 27
-    out x, 4
+    out x, 3
+    out pins, 28
     jmp delay_loop
 
 do_delay:
