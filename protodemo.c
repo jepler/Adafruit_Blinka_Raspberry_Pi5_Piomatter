@@ -83,23 +83,23 @@ static inline void protomatter_program_init(PIO pio, int sm, uint offset) {
 #define m (r|b)
 #define w (7)
 
-uint8_t pixels[DOWN][ACROSS] = {
+uint8_t pixels[][ACROSS] = {
 {_,w,_,_,r,r,_,_,_,g,_,_,b,b,b,_,c,c,_,_,y,_,y,_,m,m,m,_,w,w,w,_}, // 0
 {w,_,w,_,r,_,r,_,g,_,g,_,b,_,_,_,c,_,c,_,y,_,y,_,_,m,_,_,_,w,_,_}, // 1
 {w,w,w,_,r,_,r,_,g,g,g,_,b,b,_,_,c,c,_,_,y,_,y,_,_,m,_,_,_,w,_,_}, // 2
 {w,_,w,_,r,_,r,_,g,_,g,_,b,_,_,_,c,_,c,_,y,_,y,_,_,m,_,_,_,w,_,_}, // 3
 {w,_,w,_,r,r,_,_,g,_,g,_,b,_,_,_,c,_,c,_,_,y,_,_,m,m,m,_,_,w,_,_}, // 4
 {_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_}, // 5
-{r,_,r,_,r,_,r,_,r,_,r,_,r,_,r,_,r,_,r,_,r,_,r,_,r,_,r,_,r,_,r,_}, // 6
-{r,r,_,_,r,r,_,_,r,r,_,_,r,r,_,_,r,r,_,_,r,r,_,_,r,r,_,_,r,r,_,_}, // 7
-{g,_,g,_,g,_,g,_,g,_,g,_,g,_,g,_,g,_,g,_,g,_,g,_,g,_,g,_,g,_,g,_}, // 8
-{g,g,_,_,g,g,_,_,g,g,_,_,g,g,_,_,g,g,_,_,g,g,_,_,g,g,_,_,g,g,_,_}, // 9
-{b,_,b,_,b,_,b,_,b,_,b,_,b,_,b,_,b,_,b,_,b,_,b,_,b,_,b,_,b,_,b,_}, // 10
-{b,b,_,_,b,b,_,_,b,b,_,_,b,b,_,_,b,b,_,_,b,b,_,_,b,b,_,_,b,b,_,_}, // 11
-{w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_}, // 12
-{w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_}, // 13
-{_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w,_,w}, // 13
-{_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_}, // 15
+{_,c,_,_,y,y,_,_,_,m,_,_,r,r,r,_,g,g,_,_,b,_,b,_,w,w,w,_,c,c,c,_}, // 6
+{c,_,c,_,y,_,y,_,m,_,m,_,r,_,_,_,g,_,g,_,b,_,b,_,_,w,_,_,_,c,_,_}, // 7
+{c,c,c,_,y,_,y,_,m,m,m,_,r,r,_,_,g,g,_,_,b,_,b,_,_,w,_,_,_,c,_,_}, // 8
+{c,_,c,_,y,_,y,_,m,_,m,_,r,_,_,_,g,_,g,_,b,_,b,_,_,w,_,_,_,c,_,_}, // 9
+{c,_,c,_,y,y,_,_,m,_,m,_,r,_,_,_,g,_,g,_,_,b,_,_,w,w,w,_,_,c,_,_}, // 10
+{_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_}, // 11
+{r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,g}, // 12
+{y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,g,y}, // 13
+{g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,g,c,b}, // 14
+{c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,g,c,b,m}, // 15
 };
 
 constexpr int data_delay_shift = 28;
@@ -110,7 +110,7 @@ constexpr uint32_t delay_bit = 0;
 
 constexpr uint32_t clk_bit = 1u << PIN_CLK;
 constexpr uint32_t lat_bit = 1u << PIN_LAT;
-constexpr uint32_t oe_bit = 1u << PIN_LAT;
+constexpr uint32_t oe_bit = 1u << PIN_OE;
 constexpr uint32_t oe_active = 0;
 constexpr uint32_t oe_inactive = oe_bit;
 
@@ -168,11 +168,14 @@ std::vector<uint32_t> test_pattern() {
             add_data_word(addr_bits, r0, g0, b0, r1, g1, b1);
         }
 
-do_delay(100000);
 
         do_data(addr_bits | oe_inactive, pre_latch_delay);
         do_data(addr_bits | oe_inactive | lat_bit, post_latch_delay);
+        do_delay(1000);
+        addr_bits = calc_addr_bits(addr);
         do_data(addr_bits | oe_inactive, post_latch_delay);
+        do_delay(1000);
+
     }
 
     return result;
