@@ -102,7 +102,7 @@ uint8_t pixels[DOWN][ACROSS] = {
 {_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_,_,w,w,_}, // 15
 };
 
-constexpr int delay_shift = 28;
+constexpr int data_delay_shift = 28;
 constexpr uint32_t data_delay = 1;
 constexpr uint32_t clock_delay = 3;
 constexpr uint32_t data_bit = 1u <<31;
@@ -122,7 +122,7 @@ std::vector<uint32_t> test_pattern() {
 
     auto do_data = [&](uint32_t d, uint32_t delay=0) {
         assert(delay < 8);
-        result.push_back(data_bit | (delay << delay_shift) | d);
+        result.push_back(data_bit | (delay << data_delay_shift) | d);
     };
 
     auto do_delay = [&](uint32_t delay) {
@@ -168,10 +168,11 @@ std::vector<uint32_t> test_pattern() {
             add_data_word(addr_bits, r0, g0, b0, r1, g1, b1);
         }
 
-        do_data(addr_bits | oe_inactive, pre_latch_delay);
+do_delay(100000);
 
-        addr_bits = calc_addr_bits(addr);
+        do_data(addr_bits | oe_inactive, pre_latch_delay);
         do_data(addr_bits | oe_inactive | lat_bit, post_latch_delay);
+        do_data(addr_bits | oe_inactive, post_latch_delay);
     }
 
     return result;
