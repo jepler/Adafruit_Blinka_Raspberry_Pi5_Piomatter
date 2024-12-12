@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -128,13 +129,18 @@ std::vector<uint32_t> test_pattern() {
         result.push_back(delay_bit | delay);
     };
 
-    auto add_data_word = [&](int addr, bool r0, bool g0, bool b0, bool r1, bool g1, bool b1) {
-        uint32_t data = oe_active;
+    auto calc_addr_bits = [](int addr) {
+        uint32_t data = 0;
         if(addr & 1) data |= (1 << PIN_ADDR_A);
         if(addr & 2) data |= (1 << PIN_ADDR_B);
         if(addr & 4) data |= (1 << PIN_ADDR_C);
         if(addr & 8) data |= (1 << PIN_ADDR_D);
         if(addr & 16) data |= (1 << PIN_ADDR_E);
+        return data;
+    };
+
+    auto add_data_word = [&](uint32_t addr_bits, bool r0, bool g0, bool b0, bool r1, bool g1, bool b1) {
+        uint32_t data = oe_active | addr_bits;
         if(r0) data |= (1 << PIN_R0);
         if(g0) data |= (1 << PIN_G0);
         if(b0) data |= (1 << PIN_B0);
@@ -147,6 +153,8 @@ std::vector<uint32_t> test_pattern() {
     };
 
     for(int addr = 0; addr < 8; addr++) {
+        uint32_t addr_bits = calc_addr_bits((addr + 7) % 8);
+
         for(int across = 0; across < ACROSS; across++) {
             auto pixel0 = pixels[addr][across];
             auto r0 = pixel0 & r;
@@ -157,17 +165,19 @@ std::vector<uint32_t> test_pattern() {
             auto g1 = pixel1 & g;
             auto b1 = pixel1 & b;
 
-            add_data_word(addr, r0, g0, b0, r1, g1, b1);
+            add_data_word(addr_bits, r0, g0, b0, r1, g1, b1);
         }
 
-        do_data(oe_inactive, pre_latch_delay);
-        do_data(oe_inactive | lat_bit, post_latch_delay);
+        do_data(addr_bits | oe_inactive, pre_latch_delay);
+
+        addr_bits = calc_addr_bits(addr);
+        do_data(addr_bits | oe_inactive | lat_bit, post_latch_delay);
     }
 
     return result;
 }
 
-int main() {
+int main(int argc, char **argv) {
     PIO pio = pio0;
     int sm = pio_claim_unused_sm(pio, true);
     pio_sm_config_xfer(pio, sm, PIO_DIR_TO_SM, 256, 1); 
@@ -188,7 +198,8 @@ int main() {
     assert(datasize < 65536);
 
 printf("%zd data elements\n", data.size());
-    for(int i=0; i<10000; i++) {
-        pio_sm_xfer_data(pio, sm, PIO_DIR_TO_SM, datasize, databuf);
+int n = argc > 1 ? atoi(argv[1]) : 1;
+    for(int i=0; i<n; i++) {
+       pio_sm_xfer_data(pio, sm, PIO_DIR_TO_SM, datasize, databuf);
     }
 }

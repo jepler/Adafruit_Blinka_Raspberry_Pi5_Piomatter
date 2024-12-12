@@ -1,7 +1,7 @@
 ; data format (out-shift-right):
 ; MSB ... LSB
-; 0 dddd.......ddd: 31-bit delay
-; 1 dddd ppp...ppp: 28 bit data + 3-bit delay
+; 0 dddd......ddd: 31-bit delay
+; 1 ddd ppp...ppp: 28 bit data + 3-bit delay
 
 .wrap_target
 top:
