@@ -18,7 +18,7 @@ delay_loop:
     jmp x--, delay_loop
 .wrap
 
-    ;; fill program out to 32 instructions
+    ;; fill program out to 32 instructions so nothing else can load
     nop
     nop
     nop

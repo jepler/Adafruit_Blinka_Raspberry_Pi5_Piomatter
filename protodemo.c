@@ -38,8 +38,8 @@ const uint8_t all_pins[] = {
     PIN_CLK,
     PIN_LAT,
 };
-#define DATA_OVERHEAD (5)
-#define DELAY_OVERHEAD (3)
+#define DATA_OVERHEAD (6)
+#define DELAY_OVERHEAD (4)
 #define CLOCKS_PER_DELAY (1)
 // so for example a DATA word with a delay of 3 will take DATA_OVERHEAD+3*CLOCKS_PER_DELAY
 
@@ -103,10 +103,10 @@ uint8_t pixels[][ACROSS] = {
 };
 
 constexpr int data_delay_shift = 28;
-constexpr uint32_t data_delay = 1;
-constexpr uint32_t clock_delay = 3;
-constexpr uint32_t data_bit = 1u <<31;
-constexpr uint32_t delay_bit = 0;
+constexpr uint32_t data_delay = 0;
+constexpr uint32_t clock_delay = 0;
+constexpr uint32_t command_data = 1u <<31;
+constexpr uint32_t command_delay = 0;
 
 constexpr uint32_t clk_bit = 1u << PIN_CLK;
 constexpr uint32_t lat_bit = 1u << PIN_LAT;
@@ -114,19 +114,28 @@ constexpr uint32_t oe_bit = 1u << PIN_OE;
 constexpr uint32_t oe_active = 0;
 constexpr uint32_t oe_inactive = oe_bit;
 
-constexpr uint32_t pre_latch_delay = 7;
+constexpr uint32_t pre_latch_delay = 0;
 constexpr uint32_t post_latch_delay = 7;
+constexpr uint32_t post_oe_delay = 10;
 
 std::vector<uint32_t> test_pattern() {
     std::vector<uint32_t> result;
-
-    auto do_data = [&](uint32_t d, uint32_t delay=0) {
-        assert(delay < 8);
-        result.push_back(data_bit | (delay << data_delay_shift) | d);
-    };
+    uint32_t time=0;
 
     auto do_delay = [&](uint32_t delay) {
-        result.push_back(delay_bit | delay);
+        time += DELAY_OVERHEAD + delay * CLOCKS_PER_DELAY;
+        result.push_back(command_delay | delay);
+    };
+
+    auto do_data = [&](uint32_t d, uint32_t delay=0) {
+        if(delay < 8) {
+            result.push_back(command_data | (delay << data_delay_shift) | d);
+            time += DATA_OVERHEAD + delay * CLOCKS_PER_DELAY;
+        } else {
+            result.push_back(command_data | d);
+            time += DATA_OVERHEAD;
+            do_delay(delay - DELAY_OVERHEAD / CLOCKS_PER_DELAY);
+        }
     };
 
     auto calc_addr_bits = [](int addr) {
@@ -153,7 +162,7 @@ std::vector<uint32_t> test_pattern() {
     };
 
     for(int addr = 0; addr < 8; addr++) {
-        uint32_t addr_bits = calc_addr_bits((addr + 7) % 8);
+        uint32_t addr_bits = calc_addr_bits((addr + 7) % 8); // address of previous line
 
         for(int across = 0; across < ACROSS; across++) {
             auto pixel0 = pixels[addr][across];
@@ -171,12 +180,11 @@ std::vector<uint32_t> test_pattern() {
 
         do_data(addr_bits | oe_inactive, pre_latch_delay);
         do_data(addr_bits | oe_inactive | lat_bit, post_latch_delay);
-        do_delay(1000);
         addr_bits = calc_addr_bits(addr);
-        do_data(addr_bits | oe_inactive, post_latch_delay);
-        do_delay(1000);
+        do_data(addr_bits | oe_inactive, post_oe_delay);
 
     }
+    printf("Time %d (%.1f us)\n", time, time*1e6/clock_get_hz(clk_sys));
 
     return result;
 }
@@ -185,6 +193,8 @@ int main(int argc, char **argv) {
     PIO pio = pio0;
     int sm = pio_claim_unused_sm(pio, true);
     pio_sm_config_xfer(pio, sm, PIO_DIR_TO_SM, 256, 1); 
+
+printf("clock %fMHz\n", clock_get_hz(clk_sys)/1e6);
 
     uint offset = pio_add_program(pio, &protomatter_program);
     printf("Loaded program at %d, using sm %d\n", offset, sm);
@@ -196,12 +206,18 @@ int main(int argc, char **argv) {
 
     std::vector<uint32_t> data = test_pattern();
 
-    uint32_t *databuf = &data[0];
-    size_t datasize = data.size() * sizeof(uint32_t);
 
+std::vector<uint32_t> dc;
+int rep = 0;
+while(dc.size() + data.size() < UINT16_MAX / sizeof(uint32_t)) {
+rep ++;
+    std::copy(data.begin(), data.end(), std::back_inserter(dc));
+}
+    uint32_t *databuf = &dc[0];
+    size_t datasize = dc.size() * sizeof(uint32_t);
     assert(datasize < 65536);
 
-printf("%zd data elements\n", data.size());
+printf("%zd data elements (%d repetitions)\n", dc.size(), rep);
 int n = argc > 1 ? atoi(argv[1]) : 1;
     for(int i=0; i<n; i++) {
        pio_sm_xfer_data(pio, sm, PIO_DIR_TO_SM, datasize, databuf);
