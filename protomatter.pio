@@ -10,13 +10,13 @@ top:
     jmp !x do_delay
     out x, 3
     out pins, 28
-    jmp delay_loop
-
-do_delay:
-    out x, 31
 delay_loop:
     jmp x--, delay_loop
 .wrap
+
+do_delay:
+    out x, 31
+    jmp delay_loop
 
     ;; fill program out to 32 instructions so nothing else can load
     nop

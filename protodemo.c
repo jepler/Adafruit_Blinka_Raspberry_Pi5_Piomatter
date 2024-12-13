@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstdlib>
 #include <stdio.h>
 #include <stdbool.h>
@@ -38,7 +39,7 @@ const uint8_t all_pins[] = {
     PIN_CLK,
     PIN_LAT,
 };
-#define DATA_OVERHEAD (6)
+#define DATA_OVERHEAD (5)
 #define DELAY_OVERHEAD (4)
 #define CLOCKS_PER_DELAY (1)
 // so for example a DATA word with a delay of 3 will take DATA_OVERHEAD+3*CLOCKS_PER_DELAY
@@ -81,7 +82,7 @@ static inline void protomatter_program_init(PIO pio, int sm, uint offset) {
 #define y (r|g)
 #define c (g|b)
 #define m (r|b)
-#define w (7)
+#define w (r|g|b)
 
 uint32_t pixels[][ACROSS] = {
 {_,w,_,_,r,r,_,_,_,g,_,_,b,b,b,_,c,c,_,_,y,_,y,_,m,m,m,_,w,w,w,_}, // 0
@@ -121,15 +122,19 @@ constexpr uint32_t oe_bit = 1u << PIN_OE;
 constexpr uint32_t oe_active = 0;
 constexpr uint32_t oe_inactive = oe_bit;
 
-constexpr uint32_t pre_latch_delay = 10;
+constexpr uint32_t post_oe_delay = 10;
 constexpr uint32_t post_latch_delay = 17;
-constexpr uint32_t post_oe_delay = 20;
+constexpr uint32_t post_addr_delay = 20;
 
-uint32_t rgb(int r, int g, int b) {
+uint32_t rgb(unsigned r, unsigned g, unsigned b) {
+    assert(r < 256);
+    assert(g < 256);
+    assert(b < 256);
     return (r << 16) | (g << 8) | b;
 }
 
 uint32_t colorwheel(int i) {
+    i = i & 0xff;
     if(i < 85) {
         return rgb(255 - i * 3, 0, i * 3);
     }
@@ -141,15 +146,18 @@ uint32_t colorwheel(int i) {
     return rgb(i * 3, 255 - i * 3, 0);
 }
 
-std::vector<uint32_t> test_pattern() {
+std::vector<uint32_t> test_pattern(int offs, int brightness) {
     std::vector<uint32_t> result;
     uint32_t time=0;
 
     for(int i=0; i<ACROSS; i++) {
-        pixels[12][i] = colorwheel(2*i);
-        pixels[13][i] = colorwheel(2*i+64);
-        pixels[14][i] = colorwheel(2*i+128);
-        pixels[15][i] = colorwheel(2*i+192);
+        pixels[11][i] = rgb(i*8, i*8, i*8);
+        //int j = 255 - i * 8;
+        //pixels[ 5][i] = rgb(j, j, j);
+        pixels[12][i] = colorwheel(2*i + offs);
+        pixels[13][i] = colorwheel(2*i+64 + offs);
+        pixels[14][i] = colorwheel(2*i+128 + offs);
+        pixels[15][i] = colorwheel(2*i+192 + offs);
     }
 
     auto do_delay = [&](uint32_t delay) {
@@ -179,8 +187,8 @@ std::vector<uint32_t> test_pattern() {
         return data;
     };
 
-    auto add_data_word = [&](uint32_t addr_bits, bool r0, bool g0, bool b0, bool r1, bool g1, bool b1) {
-        uint32_t data = oe_active | addr_bits;
+    auto add_pixels = [&](uint32_t addr_bits, bool r0, bool g0, bool b0, bool r1, bool g1, bool b1, bool active) {
+        uint32_t data = (active ? oe_active : oe_inactive) | addr_bits;
         if(r0) data |= (1 << PIN_R0);
         if(g0) data |= (1 << PIN_G0);
         if(b0) data |= (1 << PIN_B0);
@@ -189,20 +197,27 @@ std::vector<uint32_t> test_pattern() {
         if(b1) data |= (1 << PIN_B1);
 
         do_data(data, data_delay);
-        do_data(data | clk_bit, data_delay);
+        do_data(data | clk_bit, clock_delay);
     };
 
+    uint32_t base_active_time = ACROSS * (2 * DATA_OVERHEAD + data_delay + clock_delay);
+
+    int last_bit = 0;
+    int prev_addr = 7;
     for(int bit = 7; bit >= 0; bit--) {
-        int last_bit = (bit + 1) % 8;
-        uint32_t desired_duration = 400 << last_bit; // mumble
 
         uint32_t r = 1 << (16 + bit);
         uint32_t g = 1 << (8 + bit);
         uint32_t b = 1 << bit;
 
         for(int addr = 0; addr < 8; addr++) {
+            uint32_t desired_duration = base_active_time << last_bit;
+            last_bit = bit;
             uint32_t t_start = time;
-            uint32_t addr_bits = calc_addr_bits((addr + 7) % 8); // address of previous line
+
+            // illuminate the right row for data in the shift register (the previous address)
+            uint32_t addr_bits = calc_addr_bits(prev_addr);
+            prev_addr = addr;
 
             for(int across = 0; across < ACROSS; across++) {
                 auto pixel0 = pixels[addr][across];
@@ -214,26 +229,26 @@ std::vector<uint32_t> test_pattern() {
                 auto g1 = pixel1 & g;
                 auto b1 = pixel1 & b;
 
-                add_data_word(addr_bits, r0, g0, b0, r1, g1, b1);
+                add_pixels(addr_bits, r0, g0, b0, r1, g1, b1, across < brightness);
             }
 
             uint32_t t_end = time;
             uint32_t duration = t_end - t_start;
 
-            printf("line duration %d\n", duration);
-            // hold /OE low until desired time has elapsed
+            // hold /OE low until desired time has elapsed to illuminate the LAST line
             if (duration < desired_duration) {
-                printf("additional duration %d\n", desired_duration - duration);
                 do_delay(desired_duration - duration);
             }
 
-            do_data(addr_bits | oe_inactive, pre_latch_delay);
-            do_data(addr_bits | oe_inactive | lat_bit, post_latch_delay);
-            addr_bits = calc_addr_bits(addr);
             do_data(addr_bits | oe_inactive, post_oe_delay);
+            do_data(addr_bits | oe_inactive | lat_bit, post_latch_delay);
+
+            // with oe inactive, set address bits to illuminate THIS line
+            //addr_bits = calc_addr_bits(addr);
+            do_data(addr_bits | oe_inactive, post_addr_delay);
         }
     }
-    printf("Time %d (%.1f us)\n", time, time*1e6/clock_get_hz(clk_sys));
+    //printf("Time %d (%.1f us)\n", time, time*1e6/clock_get_hz(clk_sys));
 
     return result;
 }
@@ -241,7 +256,6 @@ std::vector<uint32_t> test_pattern() {
 int main(int argc, char **argv) {
     PIO pio = pio0;
     int sm = pio_claim_unused_sm(pio, true);
-    pio_sm_config_xfer(pio, sm, PIO_DIR_TO_SM, 256, 1); 
 
 printf("clock %fMHz\n", clock_get_hz(clk_sys)/1e6);
 
@@ -252,25 +266,28 @@ printf("clock %fMHz\n", clock_get_hz(clk_sys)/1e6);
     pio_sm_set_clkdiv(pio, sm, 1.0);
 
     protomatter_program_init(pio, sm, offset);
+    pio_sm_set_clkdiv(pio, sm, 1.0);
 
-    std::vector<uint32_t> data = test_pattern();
+std::vector<uint32_t> data = test_pattern(0, 0);
+FILE *f = fopen("pattern.txt", "w");
+for(auto i: data) { fprintf(f, "0x%08x, ", i); }
+fclose(f);
 
-
-std::vector<uint32_t> dc;
-int rep = 0;
-while(dc.size() + data.size() < UINT16_MAX / sizeof(uint32_t)) {
-rep ++;
-    std::copy(data.begin(), data.end(), std::back_inserter(dc));
-}
-std::swap(dc, data);
-
-    uint32_t *databuf = &data[0];
-    size_t datasize = data.size() * sizeof(uint32_t);
-    assert(datasize < 65536);
-
-printf("%zd data elements (%d repetitions)\n", data.size(), rep);
-int n = argc > 1 ? atoi(argv[1]) : 1;
+    int n = argc > 1 ? atoi(argv[1]) : 1;
     for(int i=0; i<n; i++) {
-       pio_sm_xfer_data(pio, sm, PIO_DIR_TO_SM, datasize, databuf);
+        float f = (1 + sin(i / 100.)) / 2;
+        int b = int(f * 32);
+printf("%d\n", b);
+        std::vector<uint32_t> data = test_pattern(i, b);
+
+        uint32_t *databuf = &data[0];
+        size_t datasize = data.size() * sizeof(uint32_t);
+        assert(datasize < 65536);
+
+        if (i == 0) { printf("%zd data elements\n", data.size()); }
+
+        if(i == 0) 
+            pio_sm_config_xfer(pio, sm, PIO_DIR_TO_SM, datasize, 1); 
+        pio_sm_xfer_data(pio, sm, PIO_DIR_TO_SM, datasize, databuf);
     }
 }
