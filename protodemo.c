@@ -75,15 +75,15 @@ static inline void protomatter_program_init(PIO pio, int sm, uint offset) {
 #define ACROSS (32)
 #define DOWN (16)
 #define _ (0)
-#define r (1)
-#define g (2)
-#define b (4)
+#define r (0xff0000)
+#define g (0x00ff00)
+#define b (0x0000ff)
 #define y (r|g)
 #define c (g|b)
 #define m (r|b)
 #define w (7)
 
-uint8_t pixels[][ACROSS] = {
+uint32_t pixels[][ACROSS] = {
 {_,w,_,_,r,r,_,_,_,g,_,_,b,b,b,_,c,c,_,_,y,_,y,_,m,m,m,_,w,w,w,_}, // 0
 {w,_,w,_,r,_,r,_,g,_,g,_,b,_,_,_,c,_,c,_,y,_,y,_,_,m,_,_,_,w,_,_}, // 1
 {w,w,w,_,r,_,r,_,g,g,g,_,b,b,_,_,c,c,_,_,y,_,y,_,_,m,_,_,_,w,_,_}, // 2
@@ -101,6 +101,13 @@ uint8_t pixels[][ACROSS] = {
 {g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,g,c,b}, // 14
 {c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,y,g,c,b,m,r,g,c,b,m}, // 15
 };
+#undef r
+#undef g
+#undef b
+#undef c
+#undef y
+#undef w
+#undef _
 
 constexpr int data_delay_shift = 28;
 constexpr uint32_t data_delay = 0;
@@ -114,15 +121,39 @@ constexpr uint32_t oe_bit = 1u << PIN_OE;
 constexpr uint32_t oe_active = 0;
 constexpr uint32_t oe_inactive = oe_bit;
 
-constexpr uint32_t pre_latch_delay = 0;
-constexpr uint32_t post_latch_delay = 7;
-constexpr uint32_t post_oe_delay = 10;
+constexpr uint32_t pre_latch_delay = 10;
+constexpr uint32_t post_latch_delay = 17;
+constexpr uint32_t post_oe_delay = 20;
+
+uint32_t rgb(int r, int g, int b) {
+    return (r << 16) | (g << 8) | b;
+}
+
+uint32_t colorwheel(int i) {
+    if(i < 85) {
+        return rgb(255 - i * 3, 0, i * 3);
+    }
+    if(i < 170) {
+        i -= 85;
+        return rgb(0, i * 3, 255 - i * 3);
+    }
+    i -= 170;
+    return rgb(i * 3, 255 - i * 3, 0);
+}
 
 std::vector<uint32_t> test_pattern() {
     std::vector<uint32_t> result;
     uint32_t time=0;
 
+    for(int i=0; i<ACROSS; i++) {
+        pixels[12][i] = colorwheel(2*i);
+        pixels[13][i] = colorwheel(2*i+64);
+        pixels[14][i] = colorwheel(2*i+128);
+        pixels[15][i] = colorwheel(2*i+192);
+    }
+
     auto do_delay = [&](uint32_t delay) {
+        assert(delay < 1000000);
         time += DELAY_OVERHEAD + delay * CLOCKS_PER_DELAY;
         result.push_back(command_delay | delay);
     };
@@ -161,28 +192,46 @@ std::vector<uint32_t> test_pattern() {
         do_data(data | clk_bit, data_delay);
     };
 
-    for(int addr = 0; addr < 8; addr++) {
-        uint32_t addr_bits = calc_addr_bits((addr + 7) % 8); // address of previous line
+    for(int bit = 7; bit >= 0; bit--) {
+        int last_bit = (bit + 1) % 8;
+        uint32_t desired_duration = 400 << last_bit; // mumble
 
-        for(int across = 0; across < ACROSS; across++) {
-            auto pixel0 = pixels[addr][across];
-            auto r0 = pixel0 & r;
-            auto g0 = pixel0 & g;
-            auto b0 = pixel0 & b;
-            auto pixel1 = pixels[addr+8][across];
-            auto r1 = pixel1 & r;
-            auto g1 = pixel1 & g;
-            auto b1 = pixel1 & b;
+        uint32_t r = 1 << (16 + bit);
+        uint32_t g = 1 << (8 + bit);
+        uint32_t b = 1 << bit;
 
-            add_data_word(addr_bits, r0, g0, b0, r1, g1, b1);
+        for(int addr = 0; addr < 8; addr++) {
+            uint32_t t_start = time;
+            uint32_t addr_bits = calc_addr_bits((addr + 7) % 8); // address of previous line
+
+            for(int across = 0; across < ACROSS; across++) {
+                auto pixel0 = pixels[addr][across];
+                auto r0 = pixel0 & r;
+                auto g0 = pixel0 & g;
+                auto b0 = pixel0 & b;
+                auto pixel1 = pixels[addr+8][across];
+                auto r1 = pixel1 & r;
+                auto g1 = pixel1 & g;
+                auto b1 = pixel1 & b;
+
+                add_data_word(addr_bits, r0, g0, b0, r1, g1, b1);
+            }
+
+            uint32_t t_end = time;
+            uint32_t duration = t_end - t_start;
+
+            printf("line duration %d\n", duration);
+            // hold /OE low until desired time has elapsed
+            if (duration < desired_duration) {
+                printf("additional duration %d\n", desired_duration - duration);
+                do_delay(desired_duration - duration);
+            }
+
+            do_data(addr_bits | oe_inactive, pre_latch_delay);
+            do_data(addr_bits | oe_inactive | lat_bit, post_latch_delay);
+            addr_bits = calc_addr_bits(addr);
+            do_data(addr_bits | oe_inactive, post_oe_delay);
         }
-
-
-        do_data(addr_bits | oe_inactive, pre_latch_delay);
-        do_data(addr_bits | oe_inactive | lat_bit, post_latch_delay);
-        addr_bits = calc_addr_bits(addr);
-        do_data(addr_bits | oe_inactive, post_oe_delay);
-
     }
     printf("Time %d (%.1f us)\n", time, time*1e6/clock_get_hz(clk_sys));
 
@@ -213,11 +262,13 @@ while(dc.size() + data.size() < UINT16_MAX / sizeof(uint32_t)) {
 rep ++;
     std::copy(data.begin(), data.end(), std::back_inserter(dc));
 }
-    uint32_t *databuf = &dc[0];
-    size_t datasize = dc.size() * sizeof(uint32_t);
+std::swap(dc, data);
+
+    uint32_t *databuf = &data[0];
+    size_t datasize = data.size() * sizeof(uint32_t);
     assert(datasize < 65536);
 
-printf("%zd data elements (%d repetitions)\n", dc.size(), rep);
+printf("%zd data elements (%d repetitions)\n", data.size(), rep);
 int n = argc > 1 ? atoi(argv[1]) : 1;
     for(int i=0; i<n; i++) {
        pio_sm_xfer_data(pio, sm, PIO_DIR_TO_SM, datasize, databuf);
