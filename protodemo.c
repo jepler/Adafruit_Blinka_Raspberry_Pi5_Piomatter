@@ -1,8 +1,8 @@
 #include <cmath>
+#include <cstring>
 #include <cstdlib>
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include <cstdio>
+#include <cstdint>
 #include <vector>
 
 #include "hardware/pio.h"   
@@ -73,12 +73,38 @@ static inline void protomatter_program_init(PIO pio, int sm, uint offset) {
 
 }
 
+constexpr uint16_t gamma_lut[256] = {
+     0,   0,   0,   0,   0,   0,   1,   1,   1,   1,   2,   2,   2,   3,   3,   4,
+     4,   5,   5,   6,   6,   7,   8,   8,   9,  10,  11,  11,  12,  13,  14,  15,
+    16,  17,  18,  19,  20,  22,  23,  24,  25,  26,  28,  29,  30,  32,  33,  35,
+    36,  38,  39,  41,  43,  44,  46,  48,  49,  51,  53,  55,  57,  59,  60,  62,
+    64,  66,  69,  71,  73,  75,  77,  79,  82,  84,  86,  88,  91,  93,  96,  98,
+   101, 103, 106, 108, 111, 114, 116, 119, 122, 125, 127, 130, 133, 136, 139, 142,
+   145, 148, 151, 154, 157, 160, 164, 167, 170, 173, 177, 180, 184, 187, 190, 194,
+   197, 201, 204, 208, 212, 215, 219, 223, 227, 230, 234, 238, 242, 246, 250, 254,
+   258, 262, 266, 270, 274, 278, 282, 287, 291, 295, 300, 304, 308, 313, 317, 322,
+   326, 331, 335, 340, 345, 349, 354, 359, 363, 368, 373, 378, 383, 388, 393, 398,
+   403, 408, 413, 418, 423, 428, 434, 439, 444, 449, 455, 460, 465, 471, 476, 482,
+   487, 493, 498, 504, 510, 515, 521, 527, 533, 538, 544, 550, 556, 562, 568, 574,
+   580, 586, 592, 598, 604, 611, 617, 623, 629, 636, 642, 648, 655, 661, 668, 674,
+   681, 687, 694, 700, 707, 714, 720, 727, 734, 741, 748, 755, 761, 768, 775, 782,
+   789, 796, 804, 811, 818, 825, 832, 839, 847, 854, 861, 869, 876, 884, 891, 899,
+   906, 914, 921, 929, 937, 944, 952, 960, 968, 975, 983, 991, 999,1007,1015,1023,
+  };
+constexpr uint32_t rgb(unsigned r, unsigned g, unsigned b) {
+    assert(r < 256);
+    assert(g < 256);
+    assert(b < 256);
+    return (gamma_lut[r] << 20) | (gamma_lut[g] << 10) | gamma_lut[b];
+}
+
+
 #define ACROSS (32)
 #define DOWN (16)
 #define _ (0)
-#define r (0xff0000)
-#define g (0x00ff00)
-#define b (0x0000ff)
+#define r rgb(255,0,0)
+#define g rgb(0,255,0)
+#define b rgb(0,0,255)
 #define y (r|g)
 #define c (g|b)
 #define m (r|b)
@@ -111,8 +137,8 @@ uint32_t pixels[][ACROSS] = {
 #undef _
 
 constexpr int data_delay_shift = 28;
-constexpr uint32_t data_delay = 0;
-constexpr uint32_t clock_delay = 0;
+constexpr uint32_t data_delay = 2;
+constexpr uint32_t clock_delay = 2;
 constexpr uint32_t command_data = 1u <<31;
 constexpr uint32_t command_delay = 0;
 
@@ -125,13 +151,6 @@ constexpr uint32_t oe_inactive = oe_bit;
 constexpr uint32_t post_oe_delay = 10;
 constexpr uint32_t post_latch_delay = 17;
 constexpr uint32_t post_addr_delay = 20;
-
-uint32_t rgb(unsigned r, unsigned g, unsigned b) {
-    assert(r < 256);
-    assert(g < 256);
-    assert(b < 256);
-    return (r << 16) | (g << 8) | b;
-}
 
 uint32_t colorwheel(int i) {
     i = i & 0xff;
@@ -160,6 +179,12 @@ std::vector<uint32_t> test_pattern(int offs, int brightness) {
         pixels[15][i] = colorwheel(2*i+192 + offs);
     }
 
+if(1) {
+memset(pixels, 0, sizeof(pixels));
+for(int i=0; i<DOWN; i++) {
+pixels[i][2*i] = rgb(255,0,0);
+}
+}
     auto do_delay = [&](uint32_t delay) {
         assert(delay < 1000000);
         time += DELAY_OVERHEAD + delay * CLOCKS_PER_DELAY;
@@ -206,15 +231,16 @@ std::vector<uint32_t> test_pattern(int offs, int brightness) {
     int prev_addr = 7;
     for(int bit = 7; bit >= 0; bit--) {
 
-        uint32_t r = 1 << (16 + bit);
-        uint32_t g = 1 << (8 + bit);
-        uint32_t b = 1 << bit;
+        uint32_t r = 1 << (20 + 2 + bit);
+        uint32_t g = 1 << (10 + 2 + bit);
+        uint32_t b = 1 << (2 + bit);
 
         for(int addr = 0; addr < 8; addr++) {
             uint32_t desired_duration = base_active_time << last_bit;
             last_bit = bit;
             uint32_t t_start = time;
 
+printf("addr=%d prev_addr=%d\n", addr, prev_addr);
             // illuminate the right row for data in the shift register (the previous address)
             uint32_t addr_bits = calc_addr_bits(prev_addr);
             prev_addr = addr;
@@ -244,7 +270,7 @@ std::vector<uint32_t> test_pattern(int offs, int brightness) {
             do_data(addr_bits | oe_inactive | lat_bit, post_latch_delay);
 
             // with oe inactive, set address bits to illuminate THIS line
-            //addr_bits = calc_addr_bits(addr);
+            addr_bits = calc_addr_bits(addr);
             do_data(addr_bits | oe_inactive, post_addr_delay);
         }
     }
@@ -268,9 +294,11 @@ printf("clock %fMHz\n", clock_get_hz(clk_sys)/1e6);
     protomatter_program_init(pio, sm, offset);
     pio_sm_set_clkdiv(pio, sm, 1.0);
 
-std::vector<uint32_t> data = test_pattern(0, 0);
+std::vector<uint32_t> data = test_pattern(0, 33);
 FILE *f = fopen("pattern.txt", "w");
-for(auto i: data) { fprintf(f, "0x%08x, ", i); }
+fprintf(f, "[\n");
+for(auto i: data) { fprintf(f, "0x%08x,\n", i); }
+fprintf(f, "]\n");
 fclose(f);
 
     int n = argc > 1 ? atoi(argv[1]) : 1;
@@ -278,7 +306,7 @@ fclose(f);
         float f = (1 + sin(i / 100.)) / 2;
         int b = int(f * 32);
 printf("%d\n", b);
-        std::vector<uint32_t> data = test_pattern(i, b);
+        std::vector<uint32_t> data = test_pattern(i, 16);
 
         uint32_t *databuf = &data[0];
         size_t datasize = data.size() * sizeof(uint32_t);
