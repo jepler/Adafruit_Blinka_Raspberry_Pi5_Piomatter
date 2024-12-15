@@ -223,22 +223,21 @@ pixels[i][2*i] = rgb(255,0,0);
 
     int last_bit = 0;
     int prev_addr = 7;
-#define N_PLANES 8
+#define N_PLANES 10
 #define N_BITS 10
 #define OFFSET (N_BITS - N_PLANES)
-    for(int bit = N_PLANES - 1; bit >= 0; bit--) {
-        uint32_t r = 1 << (20 + OFFSET + bit);
-        uint32_t g = 1 << (10 + OFFSET + bit);
-        uint32_t b = 1 << (0 + OFFSET + bit);
+    for(int addr = 0; addr < 8; addr++) {
+        for(int bit = N_PLANES - 1; bit >= 0; bit--) {
+            uint32_t r = 1 << (20 + OFFSET + bit);
+            uint32_t g = 1 << (10 + OFFSET + bit);
+            uint32_t b = 1 << (0 + OFFSET + bit);
 
-        for(int addr = 0; addr < 8; addr++) {
             // the shortest /OE we can do is one DATA_OVERHEAD...
             uint32_t desired_duration = 1 << last_bit;
             last_bit = bit;
 
             // illuminate the right row for data in the shift register (the previous address)
             uint32_t addr_bits = calc_addr_bits(prev_addr);
-            prev_addr = addr;
 
             prep_data(2 * ACROSS);
             for(int across = 0; across < ACROSS; across++) {
@@ -263,8 +262,11 @@ pixels[i][2*i] = rgb(255,0,0);
             do_data_delay(addr_bits | oe_inactive | lat_bit, post_latch_delay);
 
             // with oe inactive, set address bits to illuminate THIS line
-            addr_bits = calc_addr_bits(addr);
-            do_data_delay(addr_bits | oe_inactive, post_addr_delay);
+            if (addr != prev_addr) {
+                addr_bits = calc_addr_bits(addr);
+                do_data_delay(addr_bits | oe_inactive, post_addr_delay);
+                prev_addr = addr;
+            }
         }
     }
 
