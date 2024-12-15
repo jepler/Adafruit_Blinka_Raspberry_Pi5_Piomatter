@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <vector>
+#include <ctime>
 
 #include "hardware/pio.h"   
 #include "protomatter.pio.h"
@@ -222,11 +223,10 @@ pixels[i][2*i] = rgb(255,0,0);
 
     int last_bit = 0;
     int prev_addr = 7;
-#define N_PLANES 6
+#define N_PLANES 8
 #define N_BITS 10
 #define OFFSET (N_BITS - N_PLANES)
-    for(int bit = N_BITS - 1; bit >= OFFSET; bit--) {
-
+    for(int bit = N_PLANES - 1; bit >= 0; bit--) {
         uint32_t r = 1 << (20 + OFFSET + bit);
         uint32_t g = 1 << (10 + OFFSET + bit);
         uint32_t b = 1 << (0 + OFFSET + bit);
@@ -278,6 +278,13 @@ void make_gamma_lut(double exponent) {
     }
 }
 
+uint64_t monotonicns64() {
+    struct timespec tp;
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+    return tp.tv_sec * UINT64_C(1000000000)+ tp.tv_nsec;
+
+}
+
 int main(int argc, char **argv) {
 {
 FILE *f = fopen("pattern.txt", "w");
@@ -309,7 +316,8 @@ printf("clock %fMHz\n", clock_get_hz(clk_sys)/1e6);
     pio_sm_set_clkdiv(pio, sm, 1.0);
 
 
-    int n = argc > 1 ? atoi(argv[1]) : 1;
+    int n = argc > 1 ? atoi(argv[1]) : 1000;
+    uint64_t start = monotonicns64();
     for(int i=0; i<n; i++) {
         std::vector<uint32_t> data = test_pattern(i);
 
@@ -323,4 +331,9 @@ printf("clock %fMHz\n", clock_get_hz(clk_sys)/1e6);
             pio_sm_config_xfer(pio, sm, PIO_DIR_TO_SM, datasize, 1); 
         pio_sm_xfer_data(pio, sm, PIO_DIR_TO_SM, datasize, databuf);
     }
+    uint64_t end = monotonicns64();
+
+    uint64_t duration = end - start;
+    double fps = n * 1e9 / duration;
+    printf("%.1f FPS [%d frames in %fs]\n", fps, n, duration / 1e9);
 }
