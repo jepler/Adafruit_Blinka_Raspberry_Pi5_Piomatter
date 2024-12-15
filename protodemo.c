@@ -222,11 +222,14 @@ pixels[i][2*i] = rgb(255,0,0);
 
     int last_bit = 0;
     int prev_addr = 7;
-    for(int bit = 9; bit >= 0; bit--) {
+#define N_PLANES 6
+#define N_BITS 10
+#define OFFSET (N_BITS - N_PLANES)
+    for(int bit = N_BITS - 1; bit >= OFFSET; bit--) {
 
-        uint32_t r = 1 << (20 + bit);
-        uint32_t g = 1 << (10 + bit);
-        uint32_t b = 1 << (0 + bit);
+        uint32_t r = 1 << (20 + OFFSET + bit);
+        uint32_t g = 1 << (10 + OFFSET + bit);
+        uint32_t b = 1 << (0 + OFFSET + bit);
 
         for(int addr = 0; addr < 8; addr++) {
             // the shortest /OE we can do is one DATA_OVERHEAD...
