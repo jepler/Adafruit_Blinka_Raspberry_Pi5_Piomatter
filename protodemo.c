@@ -133,7 +133,7 @@ constexpr uint32_t oe_inactive = oe_bit;
 
 constexpr uint32_t post_oe_delay = 0;
 constexpr uint32_t post_latch_delay = 0;
-constexpr uint32_t post_addr_delay = 5000;
+constexpr uint32_t post_addr_delay = 50;
 
 uint32_t colorwheel(int i) {
     i = i & 0xff;
@@ -150,7 +150,6 @@ uint32_t colorwheel(int i) {
 
 std::vector<uint32_t> test_pattern(int offs) {
     std::vector<uint32_t> result;
-    uint32_t time=0;
 
     for(int i=0; i<ACROSS; i++) {
         pixels[11][i] = rgb(1+i*8, 1+i*8, 1+i*8);
@@ -175,8 +174,7 @@ pixels[i][2*i] = rgb(255,0,0);
         if (delay == 0) return;
         assert(delay < 1000000);
         assert(!data_count);
-        time += DELAY_OVERHEAD + delay * CLOCKS_PER_DELAY;
-        result.push_back(command_delay | delay);
+        result.push_back(command_delay | (delay ? delay - 1 : 0));
     };
 
     auto prep_data = [&](uint32_t n) {
@@ -189,7 +187,6 @@ pixels[i][2*i] = rgb(255,0,0);
     auto do_data = [&](uint32_t d) {
         assert(data_count);
         data_count --;
-        time += DELAY_OVERHEAD;
         result.push_back(d);
     };
 
@@ -222,7 +219,6 @@ pixels[i][2*i] = rgb(255,0,0);
         do_data(data | clk_bit);
     };
 
-    uint32_t base_active_time = ACROSS * (2 * DATA_OVERHEAD);
 
     int last_bit = 0;
     int prev_addr = 7;
@@ -233,9 +229,9 @@ pixels[i][2*i] = rgb(255,0,0);
         uint32_t b = 1 << (0 + bit);
 
         for(int addr = 0; addr < 8; addr++) {
-            uint32_t desired_duration = (base_active_time << last_bit) / ACROSS;
+            // the shortest /OE we can do is one DATA_OVERHEAD...
+            uint32_t desired_duration = 1 << last_bit;
             last_bit = bit;
-            uint32_t t_start = time;
 
             // illuminate the right row for data in the shift register (the previous address)
             uint32_t addr_bits = calc_addr_bits(prev_addr);
@@ -252,15 +248,12 @@ pixels[i][2*i] = rgb(255,0,0);
                 auto g1 = pixel1 & g;
                 auto b1 = pixel1 & b;
 
-                add_pixels(addr_bits, r0, g0, b0, r1, g1, b1, (time - t_start) < desired_duration);
+                add_pixels(addr_bits, r0, g0, b0, r1, g1, b1, across < desired_duration);
             }
 
-            uint32_t t_end = time;
-            uint32_t duration = t_end - t_start;
-
             // hold /OE low until desired time has elapsed to illuminate the LAST line
-            if (duration < desired_duration) {
-                do_delay(desired_duration - duration);
+            if (desired_duration > ACROSS) {
+                do_delay((desired_duration - ACROSS) * DATA_OVERHEAD);
             }
 
             do_data_delay(addr_bits | oe_inactive, post_oe_delay);
@@ -271,9 +264,6 @@ pixels[i][2*i] = rgb(255,0,0);
             do_data_delay(addr_bits | oe_inactive, post_addr_delay);
         }
     }
-    // at end of frame set oe inactive
-    // do_data_delay(oe_inactive | calc_addr_bits(prev_addr), 0);
-    //printf("Time %d (%.1f us)\n", time, time*1e6/clock_get_hz(clk_sys));
 
     return result;
 }
