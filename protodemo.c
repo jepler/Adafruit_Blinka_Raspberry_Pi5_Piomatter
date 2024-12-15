@@ -39,7 +39,7 @@ const uint8_t all_pins[] = {
     PIN_CLK,
     PIN_LAT,
 };
-#define DATA_OVERHEAD (5)
+#define DATA_OVERHEAD (2)
 #define DELAY_OVERHEAD (4)
 #define CLOCKS_PER_DELAY (1)
 // so for example a DATA word with a delay of 3 will take DATA_OVERHEAD+3*CLOCKS_PER_DELAY
@@ -153,7 +153,7 @@ std::vector<uint32_t> test_pattern(int offs) {
     uint32_t time=0;
 
     for(int i=0; i<ACROSS; i++) {
-        pixels[11][i] = rgb(i*8, i*8, i*8);
+        pixels[11][i] = rgb(1+i*8, 1+i*8, 1+i*8);
         //int j = 255 - i * 8;
         //pixels[ 5][i] = rgb(j, j, j);
         pixels[12][i] = colorwheel(2*i + offs);
@@ -168,21 +168,35 @@ for(int i=0; i<DOWN; i++) {
 pixels[i][2*i] = rgb(255,0,0);
 }
 }
+
+    int data_count = 0;
+
     auto do_delay = [&](uint32_t delay) {
+        if (delay == 0) return;
         assert(delay < 1000000);
+        assert(!data_count);
         time += DELAY_OVERHEAD + delay * CLOCKS_PER_DELAY;
         result.push_back(command_delay | delay);
     };
 
-    auto do_data = [&](uint32_t d, uint32_t delay=0) {
-        if(delay < 8) {
-            result.push_back(command_data | (delay << data_delay_shift) | d);
-            time += DATA_OVERHEAD + delay * CLOCKS_PER_DELAY;
-        } else {
-            result.push_back(command_data | d);
-            time += DATA_OVERHEAD;
-            do_delay(delay - DELAY_OVERHEAD / CLOCKS_PER_DELAY);
-        }
+    auto prep_data = [&](uint32_t n) {
+        assert(!data_count);
+        assert(n < 60000);
+        result.push_back(command_data | (n - 1));
+        data_count = n;
+    };
+
+    auto do_data = [&](uint32_t d) {
+        assert(data_count);
+        data_count --;
+        time += DELAY_OVERHEAD;
+        result.push_back(d);
+    };
+
+    auto do_data_delay = [&](uint32_t d, uint32_t delay) {
+        prep_data(1);
+        do_data(d);
+        do_delay(delay);
     };
 
     auto calc_addr_bits = [](int addr) {
@@ -204,11 +218,11 @@ pixels[i][2*i] = rgb(255,0,0);
         if(g1) data |= (1 << PIN_G1);
         if(b1) data |= (1 << PIN_B1);
 
-        do_data(data, data_delay);
-        do_data(data | clk_bit, clock_delay);
+        do_data(data);
+        do_data(data | clk_bit);
     };
 
-    uint32_t base_active_time = ACROSS * (2 * DATA_OVERHEAD + data_delay + clock_delay);
+    uint32_t base_active_time = ACROSS * (2 * DATA_OVERHEAD);
 
     int last_bit = 0;
     int prev_addr = 7;
@@ -227,6 +241,7 @@ pixels[i][2*i] = rgb(255,0,0);
             uint32_t addr_bits = calc_addr_bits(prev_addr);
             prev_addr = addr;
 
+            prep_data(2 * ACROSS);
             for(int across = 0; across < ACROSS; across++) {
                 auto pixel0 = pixels[addr][across];
                 auto r0 = pixel0 & r;
@@ -248,16 +263,16 @@ pixels[i][2*i] = rgb(255,0,0);
                 do_delay(desired_duration - duration);
             }
 
-            do_data(addr_bits | oe_inactive, post_oe_delay);
-            do_data(addr_bits | oe_inactive | lat_bit, post_latch_delay);
+            do_data_delay(addr_bits | oe_inactive, post_oe_delay);
+            do_data_delay(addr_bits | oe_inactive | lat_bit, post_latch_delay);
 
             // with oe inactive, set address bits to illuminate THIS line
             addr_bits = calc_addr_bits(addr);
-            do_data(addr_bits | oe_inactive, post_addr_delay);
+            do_data_delay(addr_bits | oe_inactive, post_addr_delay);
         }
     }
     // at end of frame set oe inactive
-    do_data(oe_inactive | calc_addr_bits(prev_addr), 0);
+    // do_data_delay(oe_inactive | calc_addr_bits(prev_addr), 0);
     //printf("Time %d (%.1f us)\n", time, time*1e6/clock_get_hz(clk_sys));
 
     return result;
@@ -271,10 +286,23 @@ void make_gamma_lut(double exponent) {
 }
 
 int main(int argc, char **argv) {
+{
+FILE *f = fopen("pattern.txt", "w");
+std::vector<uint32_t> data = test_pattern(0);
+bool first = true;
+fprintf(f, "[\n");
+for(auto i : data) {
+if (!first) { fprintf(f, ",\n"); }
+first=false;
+fprintf(f, "%u", i); }
+fprintf(f, "]\n");
+fclose(f);
+}
+
     PIO pio = pio0;
     int sm = pio_claim_unused_sm(pio, true);
 
-    make_gamma_lut(3.2);
+    make_gamma_lut(2.2);
 
 printf("clock %fMHz\n", clock_get_hz(clk_sys)/1e6);
 
@@ -286,6 +314,7 @@ printf("clock %fMHz\n", clock_get_hz(clk_sys)/1e6);
 
     protomatter_program_init(pio, sm, offset);
     pio_sm_set_clkdiv(pio, sm, 1.0);
+
 
     int n = argc > 1 ? atoi(argv[1]) : 1;
     for(int i=0; i<n; i++) {

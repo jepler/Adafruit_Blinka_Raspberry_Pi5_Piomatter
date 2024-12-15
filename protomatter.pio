@@ -1,22 +1,22 @@
 ; data format (out-shift-right):
 ; MSB ... LSB
-; 0 dddd......ddd: 31-bit delay
-; 1 ddd ppp...ppp: 28 bit data + 3-bit delay
+; 0 ddd......ddd: 31-bit delay
+; 1 ccc......ccc: 31 bit data count
 
 .wrap_target
 top:
-    ; pull ;; use auto-pull
     out x, 1
-    jmp !x do_delay
-    out x, 3
-    out pins, 28
-delay_loop:
-    jmp x--, delay_loop
+    out y, 31
+    jmp !x delay_loop
+
+data_loop:
+    out pins, 32
+    jmp y--, data_loop
 .wrap
 
-do_delay:
-    out x, 31
-    jmp delay_loop
+delay_loop:
+    jmp y--, delay_loop
+    jmp top
 
     ;; fill program out to 32 instructions so nothing else can load
     nop
