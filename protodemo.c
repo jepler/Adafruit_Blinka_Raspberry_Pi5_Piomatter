@@ -60,7 +60,7 @@ constexpr uint32_t oe_inactive = oe_bit;
 
 constexpr uint32_t post_oe_delay = 0;
 constexpr uint32_t post_latch_delay = 0;
-constexpr uint32_t post_addr_delay = 50;
+constexpr uint32_t post_addr_delay = 500;
 
 // so for example sending 8 data words will take DATA_OVERHEAD + CLOCKS_PER_DATA*8 PIO cycles
 // and sending a delay of 5 will take DELAY_OVERHEAD + CLOCKS_PER_DELAY * 5
@@ -219,8 +219,8 @@ uint32_t rgb(unsigned r, unsigned g, unsigned b) {
 }
 
 
-#define ACROSS (32)
-#define DOWN (16)
+#define ACROSS (64)
+#define DOWN (32)
 #define N_PLANES (10)
 #define _ (0)
 #define r (1023 << 20)
@@ -231,7 +231,7 @@ uint32_t rgb(unsigned r, unsigned g, unsigned b) {
 #define m (r|b)
 #define w (r|g|b)
 
-uint32_t pixels[][ACROSS] = {
+uint32_t pixels[DOWN][ACROSS] = {
 {_,w,_,_,r,r,_,_,_,g,_,_,b,b,b,_,c,c,_,_,y,_,y,_,m,m,m,_,w,w,w,_}, // 0
 {w,_,w,_,r,_,r,_,g,_,g,_,b,_,_,_,c,_,c,_,y,_,y,_,_,m,_,_,_,w,_,_}, // 1
 {w,w,w,_,r,_,r,_,g,g,g,_,b,b,_,_,c,c,_,_,y,_,y,_,_,m,_,_,_,w,_,_}, // 2
@@ -272,11 +272,11 @@ uint32_t colorwheel(int i) {
 
 void test_pattern(std::vector<uint32_t> &result, int offs) {
     for(int i=0; i<ACROSS; i++) {
-        pixels[11][i] = rgb(1+i*8, 1+i*8, 1+i*8);
-        pixels[12][i] = colorwheel(2*i + offs / 3);
-        pixels[13][i] = colorwheel(2*i+64 + offs / 5);
-        pixels[14][i] = colorwheel(2*i+128 + offs / 2);
-        pixels[15][i] = colorwheel(2*i+192 + offs / 7);
+        pixels[DOWN-5][i] = rgb(1+i*4, 1+i*4, 1+i*4);
+        pixels[DOWN-4][i] = colorwheel(2*i + offs / 3);
+        pixels[DOWN-3][i] = colorwheel(2*i+64 + offs / 5);
+        pixels[DOWN-2][i] = colorwheel(2*i+128 + offs / 2);
+        pixels[DOWN-1][i] = colorwheel(2*i+192 + offs / 7);
     }
 
     protomatter_convert(result, &pixels[0][0], ACROSS, DOWN, N_PLANES);
@@ -293,6 +293,7 @@ static void dump_test_pattern() {
     FILE *f = fopen("pattern.txt", "w");
     std::vector<uint32_t> data;
     test_pattern(data, 0);
+    printf("%zd data elements\n", data.size());
     bool first = true;
     fprintf(f, "[\n");
     for(auto i : data) {
@@ -303,13 +304,35 @@ static void dump_test_pattern() {
     fclose(f);
 }
 
-int main(int argc, char **argv) {
-    if constexpr(0)
-        dump_test_pattern();
+constexpr size_t MAX_XFER = 32768;
 
+void pio_sm_xfer_data_large(PIO pio, int sm, int direction, size_t size, uint32_t *databuf) {
+    while(size) {
+        size_t xfersize = std::min(size_t{MAX_XFER}, size);
+        int r = pio_sm_xfer_data(pio, sm, direction, xfersize, databuf);
+        if (r) {
+            perror("pio_sm_xfer_data (reboot may be required)");
+            abort();
+        }
+        size -= xfersize;
+        databuf += xfersize / sizeof(*databuf);
+    }
+}
+
+int main(int argc, char **argv) {
+    int n = argc > 1 ? atoi(argv[1]) : 0;
+    if(n == 0) {
+        dump_test_pattern();
+        exit(0);
+    }
 
     PIO pio = pio0;
     int sm = pio_claim_unused_sm(pio, true);
+    int r = pio_sm_config_xfer(pio, sm, PIO_DIR_TO_SM, MAX_XFER, 1); 
+    if (r) {
+        perror("pio_sm_config_xfer");
+        abort();
+    }
 
     make_gamma_lut(2.2);
 
@@ -322,24 +345,18 @@ printf("clock %fMHz\n", clock_get_hz(clk_sys)/1e6);
     pio_sm_set_clkdiv(pio, sm, 1.0);
 
     protomatter_program_init(pio, sm, offset);
-    protomatter_pin_init(pio, sm, 3); 
+    protomatter_pin_init(pio, sm, 4); 
 
 
     std::vector<uint32_t> data;
-    int n = argc > 1 ? atoi(argv[1]) : 1000;
     uint64_t start = monotonicns64();
     for(int i=0; i<n; i++) {
         test_pattern(data, i);
 
         uint32_t *databuf = &data[0];
         size_t datasize = data.size() * sizeof(uint32_t);
-        assert(datasize < 65536);
 
-        if (i == 0) { printf("%zd data elements\n", data.size()); }
-
-        if(i == 0) 
-            pio_sm_config_xfer(pio, sm, PIO_DIR_TO_SM, datasize, 1); 
-        pio_sm_xfer_data(pio, sm, PIO_DIR_TO_SM, datasize, databuf);
+        pio_sm_xfer_data_large(pio, sm, PIO_DIR_TO_SM, datasize, databuf);
     }
     uint64_t end = monotonicns64();
 
