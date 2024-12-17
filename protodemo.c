@@ -9,6 +9,8 @@
 #include "hardware/pio.h"   
 #include "protomatter.pio.h"
 
+#include "matrixmap.h"
+
 #define countof(arr) (sizeof((arr)) / sizeof((arr)[0]))
 
 #define PIN_R0 (5)
@@ -97,7 +99,7 @@ static inline void protomatter_program_init(PIO pio, int sm, uint offset) {
 
 }
 
-void protomatter_convert(std::vector<uint32_t> &result, uint32_t *pixels, int across, int down, int n_planes) {
+void protomatter_convert(std::vector<uint32_t> &result, const MatrixMap &matrixmap, uint32_t *pixels, int across, int down, int n_planes) {
     result.clear();
 
     int data_count = 0;
@@ -109,7 +111,7 @@ void protomatter_convert(std::vector<uint32_t> &result, uint32_t *pixels, int ac
         result.push_back(command_delay | (delay ? delay - 1 : 0));
     };
 
-    auto prep_data = [&](uint32_t n) {
+    auto prep_data = [&data_count, &result](uint32_t n) {
         assert(!data_count);
         assert(n < 60000);
         result.push_back(command_data | (n - 1));
@@ -138,7 +140,7 @@ void protomatter_convert(std::vector<uint32_t> &result, uint32_t *pixels, int ac
         return data;
     };
 
-    auto add_pixels = [&](uint32_t addr_bits, bool r0, bool g0, bool b0, bool r1, bool g1, bool b1, bool active) {
+    auto add_pixels = [&do_data, &result](uint32_t addr_bits, bool r0, bool g0, bool b0, bool r1, bool g1, bool b1, bool active) {
         uint32_t data = (active ? oe_active : oe_inactive) | addr_bits;
         if(r0) data |= (1 << PIN_R0);
         if(g0) data |= (1 << PIN_G0);
@@ -154,6 +156,10 @@ void protomatter_convert(std::vector<uint32_t> &result, uint32_t *pixels, int ac
 
     int last_bit = 0;
     int prev_addr = 7;
+    // illuminate the right row for data in the shift register (the previous address)
+    uint32_t addr_bits = calc_addr_bits(prev_addr);
+    assert(matrixmap.size() == down * across);
+
 #define N_BITS 10
 #define OFFSET (N_BITS - n_planes)
     for(int addr = 0; addr < down / 2; addr++) {
@@ -163,19 +169,21 @@ void protomatter_convert(std::vector<uint32_t> &result, uint32_t *pixels, int ac
             uint32_t b = 1 << (0 + OFFSET + bit);
 
             // the shortest /OE we can do is one DATA_OVERHEAD...
+            // TODO: should make sure desired duration of MSB is at least `across`
             uint32_t desired_duration = 1 << last_bit;
             last_bit = bit;
 
-            // illuminate the right row for data in the shift register (the previous address)
-            uint32_t addr_bits = calc_addr_bits(prev_addr);
 
             prep_data(2 * across);
+            auto mapiter = matrixmap.begin() + 2 * addr * across;
             for(int x = 0; x < across; x++) {
-                auto pixel0 = pixels[addr*across+x];
+                assert(mapiter != matrixmap.end());
+                auto pixel0 = pixels[*mapiter++];
                 auto r0 = pixel0 & r;
                 auto g0 = pixel0 & g;
                 auto b0 = pixel0 & b;
-                auto pixel1 = pixels[(addr+down/2) * across + x];
+                assert(mapiter != matrixmap.end());
+                auto pixel1 = pixels[*mapiter++];
                 auto r1 = pixel1 & r;
                 auto g1 = pixel1 & g;
                 auto b1 = pixel1 & b;
@@ -186,7 +194,7 @@ void protomatter_convert(std::vector<uint32_t> &result, uint32_t *pixels, int ac
             // hold /OE low until desired time has elapsed to illuminate the LAST line
             int remain = desired_duration - across;
             if (remain > 0) {
-                do_delay(remain * CLOCKS_PER_DATA - DELAY_OVERHEAD);
+                do_data_delay(addr_bits | oe_active, remain * CLOCKS_PER_DATA - DELAY_OVERHEAD);
             }
 
             do_data_delay(addr_bits | oe_inactive, post_oe_delay);
@@ -219,8 +227,8 @@ uint32_t rgb(unsigned r, unsigned g, unsigned b) {
 }
 
 
-#define ACROSS (64)
-#define DOWN (32)
+#define ACROSS (32)
+#define DOWN (16)
 #define N_PLANES (10)
 #define _ (0)
 #define r (1023 << 20)
@@ -231,7 +239,9 @@ uint32_t rgb(unsigned r, unsigned g, unsigned b) {
 #define m (r|b)
 #define w (r|g|b)
 
-uint32_t pixels[DOWN][ACROSS] = {
+constexpr int width = 32, height = 16;
+
+uint32_t pixels[height][width] = {
 {_,w,_,_,r,r,_,_,_,g,_,_,b,b,b,_,c,c,_,_,y,_,y,_,m,m,m,_,w,w,w,_}, // 0
 {w,_,w,_,r,_,r,_,g,_,g,_,b,_,_,_,c,_,c,_,y,_,y,_,_,m,_,_,_,w,_,_}, // 1
 {w,w,w,_,r,_,r,_,g,g,g,_,b,b,_,_,c,c,_,_,y,_,y,_,_,m,_,_,_,w,_,_}, // 2
@@ -270,16 +280,18 @@ uint32_t colorwheel(int i) {
     return rgb(i * 3, 255 - i * 3, 0);
 }
 
+MatrixMap matrixmap;
+
 void test_pattern(std::vector<uint32_t> &result, int offs) {
-    for(int i=0; i<ACROSS; i++) {
-        pixels[DOWN-5][i] = rgb(1+i*4, 1+i*4, 1+i*4);
-        pixels[DOWN-4][i] = colorwheel(2*i + offs / 3);
-        pixels[DOWN-3][i] = colorwheel(2*i+64 + offs / 5);
-        pixels[DOWN-2][i] = colorwheel(2*i+128 + offs / 2);
-        pixels[DOWN-1][i] = colorwheel(2*i+192 + offs / 7);
+    for(int i=0; i<width; i++) {
+        pixels[height-5][i] = rgb(1+i*4, 1+i*4, 1+i*4);
+        pixels[height-4][i] = colorwheel(2*i + offs / 3);
+        pixels[height-3][i] = colorwheel(2*i+64 + offs / 5);
+        pixels[height-2][i] = colorwheel(2*i+128 + offs / 2);
+        pixels[height-1][i] = colorwheel(2*i+192 + offs / 7);
     }
 
-    protomatter_convert(result, &pixels[0][0], ACROSS, DOWN, N_PLANES);
+    protomatter_convert(result, matrixmap, &pixels[0][0], ACROSS, DOWN, N_PLANES);
 }
 static uint64_t monotonicns64() {
 
@@ -319,8 +331,13 @@ void pio_sm_xfer_data_large(PIO pio, int sm, int direction, size_t size, uint32_
     }
 }
 
+static_assert(!(DOWN & (DOWN-1))); // is a power of two
+
 int main(int argc, char **argv) {
     int n = argc > 1 ? atoi(argv[1]) : 0;
+
+    matrixmap = make_matrixmap(width, height, 3, false, orientation_r180);
+
     if(n == 0) {
         dump_test_pattern();
         exit(0);
@@ -328,7 +345,7 @@ int main(int argc, char **argv) {
 
     PIO pio = pio0;
     int sm = pio_claim_unused_sm(pio, true);
-    int r = pio_sm_config_xfer(pio, sm, PIO_DIR_TO_SM, MAX_XFER, 1); 
+    int r = pio_sm_config_xfer(pio, sm, PIO_DIR_TO_SM, MAX_XFER, 2); 
     if (r) {
         perror("pio_sm_config_xfer");
         abort();
@@ -345,7 +362,7 @@ printf("clock %fMHz\n", clock_get_hz(clk_sys)/1e6);
     pio_sm_set_clkdiv(pio, sm, 1.0);
 
     protomatter_program_init(pio, sm, offset);
-    protomatter_pin_init(pio, sm, 4); 
+    protomatter_pin_init(pio, sm, __builtin_ffs(DOWN)-2);
 
 
     std::vector<uint32_t> data;
