@@ -227,8 +227,8 @@ uint32_t rgb(unsigned r, unsigned g, unsigned b) {
 }
 
 
-#define ACROSS (32)
-#define DOWN (16)
+#define ACROSS (128)
+#define DOWN (32)
 #define N_PLANES (10)
 #define _ (0)
 #define r (1023 << 20)
@@ -239,7 +239,7 @@ uint32_t rgb(unsigned r, unsigned g, unsigned b) {
 #define m (r|b)
 #define w (r|g|b)
 
-constexpr int width = 32, height = 16;
+constexpr int width = 64, height = 64;
 
 uint32_t pixels[height][width] = {
 {_,w,_,_,r,r,_,_,_,g,_,_,b,b,b,_,c,c,_,_,y,_,y,_,m,m,m,_,w,w,w,_}, // 0
@@ -290,6 +290,9 @@ void test_pattern(std::vector<uint32_t> &result, int offs) {
         pixels[height-2][i] = colorwheel(2*i+128 + offs / 2);
         pixels[height-1][i] = colorwheel(2*i+192 + offs / 7);
     }
+    for(int i=0; i<height; i++) {
+        pixels[i][i] = rgb(0xff,0xff,0xff);
+    }
 
     protomatter_convert(result, matrixmap, &pixels[0][0], ACROSS, DOWN, N_PLANES);
 }
@@ -298,6 +301,20 @@ static uint64_t monotonicns64() {
     struct timespec tp;
     clock_gettime(CLOCK_MONOTONIC, &tp);
     return tp.tv_sec * UINT64_C(1000000000)+ tp.tv_nsec;
+
+}
+
+static void dump_matrixmap() {
+    FILE *f = fopen("matrixmap.txt", "w");
+    bool first = true;
+    fprintf(f, "[\n");
+    for(auto i : matrixmap) {
+        if (!first) { fprintf(f, ",\n"); }
+        first=false;
+        fprintf(f, "%u", i);
+    }
+    fprintf(f, "]\n");
+    fclose(f);
 
 }
 
@@ -336,9 +353,11 @@ static_assert(!(DOWN & (DOWN-1))); // is a power of two
 int main(int argc, char **argv) {
     int n = argc > 1 ? atoi(argv[1]) : 0;
 
-    matrixmap = make_matrixmap(width, height, 3, false, orientation_r180);
+    // matrixmap = make_matrixmap(width, height, 3, false, orientation_r180);
+    matrixmap = make_matrixmap(width, height, 4, true, orientation_normal);
 
     if(n == 0) {
+        dump_matrixmap();
         dump_test_pattern();
         exit(0);
     }

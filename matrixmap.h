@@ -61,7 +61,7 @@ MatrixMap make_matrixmap(
     MatrixMap result;
     result.reserve(width*height);
 
-printf("width=%d across=%d panel_height=%d v_panels=%d\n", width, across, panel_height, v_panels);
+printf("width=%d across=%d height=%d panel_height=%d v_panels=%d\n", width, across, height, panel_height, v_panels);
     for(int i=0; i<half_panel_height; i++) {
         for(int j=0; j<across; j++) {
             int panel_no = j / width; 
