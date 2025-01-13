@@ -1,2 +1,2 @@
-*.pio.h
+./*.pio.h
 protodemo
