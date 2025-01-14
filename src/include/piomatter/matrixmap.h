@@ -82,7 +82,7 @@ matrix_map make_matrixmap(size_t width, size_t height, size_t n_addr_lines,
 
 struct matrix_geometry {
     template <typename Cb>
-    matrix_geometry(size_t pixels_across, size_t n_addr_lines, size_t n_planes,
+    matrix_geometry(size_t pixels_across, size_t n_addr_lines, int n_planes,
                     size_t width, size_t height, bool serpentine, const Cb &cb)
         : pixels_across(pixels_across), n_addr_lines(n_addr_lines),
           n_planes(n_planes), width(width),
@@ -94,7 +94,9 @@ struct matrix_geometry {
                 "map size does not match calculated pixel count");
         }
     }
-    size_t pixels_across, n_addr_lines, n_planes, width, height;
+    size_t pixels_across, n_addr_lines;
+    int n_planes;
+    size_t width, height;
     matrix_map map;
 };
 } // namespace piomatter

@@ -32,11 +32,11 @@ struct gamma_lut {
     void convert_rgb888_packed_to_rgb10(std::vector<uint32_t> &result,
                                         std::span<const uint8_t> source) {
         result.resize(source.size() / 3);
-        for (size_t i = 0; i < source.size(); i += 3) {
+        for (size_t i = 0, j = 0; i < source.size(); i += 3) {
             uint32_t r = source[i + 0] & 0xff;
             uint32_t g = source[i + 1] & 0xff;
             uint32_t b = source[i + 2] & 0xff;
-            result[i] = (convert(r) << 20) | (convert(g) << 10) | convert(b);
+            result[j++] = (convert(r) << 20) | (convert(g) << 10) | convert(b);
         }
     }
 
@@ -210,17 +210,19 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
     // illuminate the right row for data in the shift register (the previous
     // address)
 
-    const auto n_addr = 1u << matrixmap.n_addr_lines;
-    const auto n_planes = matrixmap.n_planes;
-    constexpr auto n_bits = 10u;
+    const size_t n_addr = 1u << matrixmap.n_addr_lines;
+    const int n_planes = matrixmap.n_planes;
+    constexpr size_t n_bits = 10u;
     unsigned offset = n_bits - n_planes;
-    const auto pixels_across = matrixmap.pixels_across;
+    const size_t pixels_across = matrixmap.pixels_across;
 
     size_t prev_addr = n_addr - 1;
     uint32_t addr_bits = calc_addr_bits(prev_addr);
 
     for (size_t addr = 0; addr < n_addr; addr++) {
-        for (size_t bit = n_planes - 1; bit >= 0; bit--) {
+        // printf("addr=%zu/%zu\n", addr, n_addr);
+        for (int bit = n_planes - 1; bit >= 0; bit--) {
+            // printf("bit=%d/%d\n", bit, n_planes);
             uint32_t r = 1 << (20 + offset + bit);
             uint32_t g = 1 << (10 + offset + bit);
             uint32_t b = 1 << (0 + offset + bit);
