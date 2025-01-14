@@ -12,28 +12,20 @@ struct buffer_manager {
         free_buffers.push(2);
     }
 
-    int get_free_buffer() {
-        return free_buffers.pop_blocking();
-    }
-    void put_free_buffer(int i) {
-        free_buffers.push(i);
-    }
+    int get_free_buffer() { return free_buffers.pop_blocking(); }
+    void put_free_buffer(int i) { free_buffers.push(i); }
 
     int get_filled_buffer() {
         auto r = filled_buffers.pop_nonblocking();
         return r ? r.value() : no_buffer;
     }
 
-    void put_filled_buffer(int i) {
-        filled_buffers.push(i);
-    }
+    void put_filled_buffer(int i) { filled_buffers.push(i); }
 
-    void request_exit() {
-        filled_buffers.push(exit_request);
-    }
+    void request_exit() { filled_buffers.push(exit_request); }
 
-private:
+  private:
     thread_queue<int> free_buffers, filled_buffers;
 };
 
-}
+} // namespace piomatter
