@@ -1,5 +1,5 @@
-protodemo: protodemo.c piolib/*.c include/piomatter/*.h include/piomatter/protomatter.pio.h
-	g++ -std=c++20 -Og -ggdb -x c++ -Iinclude -Ipiolib/include -o $@ $(filter %.c, $^) -Wno-narrowing
+protodemo: protodemo.c piolib/*.c include/piomatter/*.h include/piomatter/protomatter.pio.h Makefile
+	g++ -std=c++20 -O0 -ggdb -x c++ -Iinclude -Ipiolib/include -o $@ $(filter %.c, $^) -Wno-narrowing
 
 matrixmap.h:
 

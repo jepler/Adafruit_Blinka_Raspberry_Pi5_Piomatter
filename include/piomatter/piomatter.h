@@ -12,15 +12,14 @@
 
 namespace piomatter {
 
-constexpr size_t MAX_XFER = 65548;
+constexpr size_t MAX_XFER = 32768;
 
 void pio_sm_xfer_data_large(PIO pio, int sm, int direction, size_t size, uint32_t *databuf) {
     while(size) {
         size_t xfersize = std::min(size_t{MAX_XFER}, size);
         int r = pio_sm_xfer_data(pio, sm, direction, xfersize, databuf);
         if (r) {
-            perror("pio_sm_xfer_data (reboot may be required)");
-            abort();
+            throw std::runtime_error("pio_sm_xfer_data (reboot may be required)");
         }
         size -= xfersize;
         databuf += xfersize / sizeof(*databuf);
@@ -48,6 +47,7 @@ struct piomatter : piomatter_base {
         auto &buffer = buffers[buffer_idx];
         auto converted = converter.convert(framebuffer);
         protomatter_render_rgb10<pinout>(buffer, geometry, converted.data());
+        manager.put_filled_buffer(buffer_idx);
     }
 
     ~piomatter() {
@@ -64,11 +64,12 @@ private:
     void program_init() {
         pio = pio0;
         sm = pio_claim_unused_sm(pio, true);
+printf("pio@%p sm%d\n", pio, sm);
         if (sm < 0) {
             throw std::runtime_error("pio_claim_unused_sm");
         }
         int r = pio_sm_config_xfer(pio, sm, PIO_DIR_TO_SM, MAX_XFER, 2); 
-        if (!r) {
+        if (r) {
             throw std::runtime_error("pio_sm_config_xfer");
         }
 
@@ -114,15 +115,17 @@ private:
 
     void blit_thread() {
         const uint32_t *databuf = nullptr;
-        size_t datasize;
+        size_t datasize = 0;
 
         int buffer_idx;
         while((buffer_idx = manager.get_filled_buffer()) != buffer_manager::exit_request) {
+printf("buffer_idx=%d\n", buffer_idx);
             if(buffer_idx != buffer_manager::no_buffer) {
                 const auto &buffer = buffers[buffer_idx];
                 databuf = &buffer[0];
                 datasize = buffer.size() * sizeof(*databuf);
             }
+printf("datasize=%zu\n", datasize);
             if (datasize) {
                 pio_sm_xfer_data_large(pio, sm, PIO_DIR_TO_SM, datasize, (uint32_t*)databuf);
             } else {
