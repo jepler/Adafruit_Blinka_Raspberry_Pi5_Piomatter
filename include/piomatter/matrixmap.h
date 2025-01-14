@@ -3,7 +3,9 @@
 #include <vector>
 #include <stdexcept>
 
-using MatrixMap = std::vector<int>;
+namespace piomatter {
+
+using matrix_map = std::vector<int>;
 
 int orientation_normal(int width, int height, int x, int y) {
     return x + width * y;
@@ -43,7 +45,7 @@ namespace {
 }
 
 template<typename Cb>
-MatrixMap make_matrixmap(
+matrix_map make_matrixmap(
     int width,
     int height,
     int n_addr_lines,
@@ -57,13 +59,12 @@ MatrixMap make_matrixmap(
 
     int half_panel_height = 1 << n_addr_lines;
     int v_panels = height / panel_height;
-    int across = width * v_panels;
-    MatrixMap result;
+    int pixels_across = width * v_panels;
+    matrix_map result;
     result.reserve(width*height);
 
-printf("width=%d across=%d panel_height=%d v_panels=%d\n", width, across, panel_height, v_panels);
     for(int i=0; i<half_panel_height; i++) {
-        for(int j=0; j<across; j++) {
+        for(int j=0; j<pixels_across; j++) {
             int panel_no = j / width; 
             int panel_idx = j % width;
             int x, y0, y1;
@@ -83,4 +84,17 @@ printf("width=%d across=%d panel_height=%d v_panels=%d\n", width, across, panel_
     }
 
     return result;
+}
+
+struct matrix_geometry {
+    template<typename Cb>
+    matrix_geometry(int pixels_across, int n_addr_lines, int n_planes, int width, int height, bool serpentine, const Cb &cb) : pixels_across(pixels_across), n_addr_lines(n_addr_lines), n_planes(n_planes), width(width), height(height), map{make_matrixmap(width, height, n_addr_lines, serpentine, cb)} {
+    int pixels_down = 2 << n_addr_lines;
+    if (map.size() != pixels_down * pixels_across) {
+        throw std::range_error("map size does not match calculated pixel count");
+    }
+}
+    int pixels_across, n_addr_lines, n_planes, width, height;
+    matrix_map map;
+};
 }
