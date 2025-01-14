@@ -1,7 +1,9 @@
 import sys
 from contextlib import contextmanager
-import click
+
 import adafruit_pioasm
+import click
+
 
 @contextmanager
 def temporary_stdout(filename):

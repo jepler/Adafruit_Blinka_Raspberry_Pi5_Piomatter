@@ -198,10 +198,8 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
     };
 
     int last_bit = 0;
-    int prev_addr = 7;
     // illuminate the right row for data in the shift register (the previous
     // address)
-    uint32_t addr_bits = calc_addr_bits(prev_addr);
 
     const auto n_addr = 1u << matrixmap.n_addr_lines;
     const auto n_planes = matrixmap.n_planes;
@@ -209,8 +207,11 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
     unsigned offset = n_bits - n_planes;
     const auto pixels_across = matrixmap.pixels_across;
 
-    for (int addr = 0; addr < n_addr; addr++) {
-        for (int bit = n_planes - 1; bit >= 0; bit--) {
+    size_t prev_addr = n_addr - 1;
+    uint32_t addr_bits = calc_addr_bits(prev_addr);
+
+    for (size_t addr = 0; addr < n_addr; addr++) {
+        for (size_t bit = n_planes - 1; bit >= 0; bit--) {
             uint32_t r = 1 << (20 + offset + bit);
             uint32_t g = 1 << (10 + offset + bit);
             uint32_t b = 1 << (0 + offset + bit);
@@ -223,7 +224,7 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
 
             prep_data(2 * pixels_across);
             auto mapiter = matrixmap.map.begin() + 2 * addr * pixels_across;
-            for (int x = 0; x < pixels_across; x++) {
+            for (size_t x = 0; x < pixels_across; x++) {
                 assert(mapiter != matrixmap.map.end());
                 auto pixel0 = pixels[*mapiter++];
                 auto r0 = pixel0 & r;
