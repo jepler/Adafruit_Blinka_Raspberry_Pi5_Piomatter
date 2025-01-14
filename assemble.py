@@ -11,7 +11,7 @@ def temporary_stdout(filename):
             yield sys.stdout
     finally:
         sys.stdout = old_stdout
-    
+
 @click.command
 @click.argument("infile")
 @click.argument("outfile")
@@ -19,7 +19,7 @@ def main(infile, outfile):
     program_name = infile.rpartition("/")[2].partition(".")[0]
     print(program_name)
     program = adafruit_pioasm.Program.from_file(infile, build_debuginfo=True)
-    
+
     with temporary_stdout(outfile):
         program.print_c_program(program_name)
 
