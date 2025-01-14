@@ -11,13 +11,13 @@ __version__ = get_version()
 #   say from a submodule.
 
 ext_modules = [
-    Pybind11Extension("adafruit_raspberry_pi5_neopixel_write",
+    Pybind11Extension("adafruit_raspberry_pi5_piomatter",
         ["src/pymain.cpp", "src/piolib/piolib.c", "src/piolib/pio_rp1.c"],
         define_macros = [('VERSION_INFO', __version__)],
         include_dirs = ['./src/include', './src/piolib/include'],
         cxx_std=20,
         # use this setting when debugging
-        #extra_compile_args = ["-g3", "-Og"],
+        extra_compile_args = ["-g3", "-Og"],
         ),
 ]
 
@@ -25,7 +25,7 @@ setup(
     name="Adafruit-Blinka-Raspberry-Pi5-Neopixel",
     version=__version__,
     url="https://github.com/adafruit/Adafruit_Blinka_Raspberry_Pi5_Neopixel",
-    description="Control NeoPixel & compatibles on a Pi 5",
+    description="HUB75 matrix driver for Raspberry Pi 5 using PIO",
     long_description="A pio-based driver",
     ext_modules=ext_modules,
     # Currently, build_ext only provides an optional "highest supported C++

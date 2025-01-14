@@ -73,6 +73,9 @@ struct gamma_lut {
 
 struct colorspace_rgb565 {
     using data_type = uint16_t;
+    static constexpr size_t data_size_in_bytes(size_t n_pixels) {
+        return sizeof(data_type) * n_pixels;
+    }
 
     colorspace_rgb565(float gamma = 2.2) : lut{gamma} {}
     gamma_lut lut;
@@ -86,6 +89,9 @@ struct colorspace_rgb565 {
 
 struct colorspace_rgb888 {
     using data_type = uint32_t;
+    static constexpr size_t data_size_in_bytes(size_t n_pixels) {
+        return sizeof(data_type) * n_pixels;
+    }
 
     colorspace_rgb888(float gamma = 2.2) : lut{gamma} {}
     gamma_lut lut;
@@ -99,6 +105,9 @@ struct colorspace_rgb888 {
 
 struct colorspace_rgb888_packed {
     using data_type = uint8_t;
+    static constexpr size_t data_size_in_bytes(size_t n_pixels) {
+        return sizeof(data_type) * n_pixels * 3;
+    }
 
     colorspace_rgb888_packed(float gamma = 2.2) : lut{gamma} {}
     gamma_lut lut;

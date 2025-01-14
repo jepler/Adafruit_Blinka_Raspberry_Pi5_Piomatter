@@ -1,5 +1,6 @@
 #include <iostream>
 #include <pybind11/pybind11.h>
+#include <string>
 
 #include "piomatter/piomatter.h"
 
@@ -8,12 +9,47 @@
 
 namespace py = pybind11;
 
-namespace {}
+namespace {
+struct PyPiomatter {
+    PyPiomatter(py::buffer buffer,
+                std::unique_ptr<piomatter::piomatter_base> &&matter)
+        : buffer{buffer}, matter{std::move(matter)} {}
+    py::buffer buffer;
+    std::unique_ptr<piomatter::piomatter_base> matter;
+
+    void show() { matter->show(); }
+};
+
+template <typename pinout, typename colorspace>
+std::unique_ptr<PyPiomatter>
+make_piomatter(py::buffer buffer, const piomatter::matrix_geometry &geometry) {
+    using cls = piomatter::piomatter<pinout, colorspace>;
+    using data_type = colorspace::data_type;
+
+    const auto n_pixels = geometry.width * geometry.height;
+    const auto data_size_in_bytes = colorspace::data_size_in_bytes(n_pixels);
+    const py::buffer_info info = buffer.request();
+    const size_t buffer_size_in_bytes = info.size * info.itemsize;
+
+    if (buffer_size_in_bytes != data_size_in_bytes) {
+        throw std::runtime_error(
+            py::str(
+                "Framebuffer size must be {} bytes, got a buffer of {} bytes")
+                .attr("format")(data_size_in_bytes, buffer_size_in_bytes)
+                .template cast<std::string>());
+    }
+
+    std::span<data_type> framebuffer(reinterpret_cast<data_type *>(info.ptr),
+                                     data_size_in_bytes / sizeof(data_type));
+    return std::make_unique<PyPiomatter>(
+        buffer, std::move(std::make_unique<cls>(framebuffer, geometry)));
+}
+} // namespace
 
 PYBIND11_MODULE(adafruit_raspberry_pi5_piomatter, m) {
     m.doc() = R"pbdoc(
-        hub75 matrix driver for pi5 using pio
-        -------------------------------------
+        HUB75 matrix driver for Raspberry Pi 5 using PIO
+        ------------------------------------------------
 
         .. currentmodule:: adafruit_raspberry_pi5_piomatter
 
@@ -23,77 +59,79 @@ PYBIND11_MODULE(adafruit_raspberry_pi5_piomatter, m) {
            Piomatter
     )pbdoc";
 
-#if 0
-    py::enum_<piomatter::orientation>(m, "Orientation", py::doc("describes the orientation of a panel"))
+    py::enum_<piomatter::orientation>(m, "Orientation")
         .value("Normal", piomatter::orientation::normal)
         .value("R180", piomatter::orientation::r180)
         .value("CCW", piomatter::orientation::ccw)
         .value("CW", piomatter::orientation::cw)
-    ;
-#endif
+        //.doc() = "Describes the orientation of a panel"
+        ;
 
-    py::class_<piomatter::matrix_geometry>(m, "Geometry"
-#if 0
-        , py::doc("Describes the geometry of a panel")
-#endif
-                                           )
-        .def(py::init([](size_t width, size_t height, size_t pixels_across,
-                         size_t n_addr_lines, bool serpentine, int rotation,
+    py::class_<piomatter::matrix_geometry>(m, "Geometry")
+        .def(py::init([](size_t width, size_t height, size_t n_addr_lines,
+                         bool serpentine, piomatter::orientation rotation,
                          size_t n_planes) {
+                 size_t n_lines = 2 << n_addr_lines;
+                 size_t pixels_across = width * height / n_lines;
+                 size_t odd = (width * height) % n_lines;
+                 if (odd) {
+                     throw std::runtime_error(
+                         py::str(
+                             "Total pixel count {} must be a multiple of {}, "
+                             "the number of distinct row addresses for {}")
+                             .attr("format")(width * height, n_lines,
+                                             n_addr_lines)
+                             .cast<std::string>());
+                 }
                  switch (rotation) {
-                 case 0:
+                 case piomatter::orientation::normal:
                      return piomatter::matrix_geometry(
                          pixels_across, n_addr_lines, n_planes, width, height,
                          serpentine, piomatter::orientation_normal);
 
-                 case 180:
+                 case piomatter::orientation::r180:
                      return piomatter::matrix_geometry(
                          pixels_across, n_addr_lines, n_planes, width, height,
                          serpentine, piomatter::orientation_r180);
 
-                 case 90:
+                 case piomatter::orientation::ccw:
                      return piomatter::matrix_geometry(
                          pixels_across, n_addr_lines, n_planes, width, height,
                          serpentine, piomatter::orientation_ccw);
 
-                 case 270:
+                 case piomatter::orientation::cw:
                      return piomatter::matrix_geometry(
                          pixels_across, n_addr_lines, n_planes, width, height,
                          serpentine, piomatter::orientation_cw);
                  }
-                 throw std::runtime_error("invalid orientation");
-             })
-#if 1
-                 ,
-             py::arg("width"), py::arg("height"), py::arg("pixels_across"),
-             py::arg("n_addr_lines"), py::arg("serpentine") = false,
-             py::arg("orientation") = 0u, py::arg("n_planes") = 10u
-#endif
-             )
+                 throw std::runtime_error("invalid rotation");
+             }),
+             py::arg("width"), py::arg("height"), py::arg("n_addr_lines"),
+             py::arg("serpentine") = true,
+             py::arg("rotation") = piomatter::orientation::normal,
+             py::arg("n_planes") = 10u)
         .def_readonly("width", &piomatter::matrix_geometry::width)
-        .def_readonly("hieght", &piomatter::matrix_geometry::height);
+        .def_readonly("hieght", &piomatter::matrix_geometry::height)
+        //.doc() = "Describes the geometry of a panel"
+        ;
 
-#if 0
-    py::class_<piomatter::piomatter_base>(m, "PiomatterBase", py::doc("Base class of all pinouts"))
-        .def("show", &piomatter_base::show)
-    ;
-#endif
+    py::class_<PyPiomatter>(m, "PioMatter").def("show", &PyPiomatter::show)
+        //.doc() = "HUB75 matrix driver for Raspberry Pi 5 using PIO"
+        ;
 
-    using AdafruitMatrixBonnetRGB888 =
-        piomatter::piomatter<piomatter::adafruit_matrix_bonnet_pinout,
-                             piomatter::colorspace_rgb888>;
-    py::class_<AdafruitMatrixBonnetRGB888>(
-        m, "AdafruitMatrixBonnetRGB888") // .def(py::init<py::buffer,
-                                         // matrix_geometry>())
-        .def("show", &AdafruitMatrixBonnetRGB888::show);
+    m.def("AdafruitMatrixBonnetRGB888",
+          make_piomatter<piomatter::adafruit_matrix_bonnet_pinout,
+                         piomatter::colorspace_rgb888>,
+          py::arg("buffer"), py::arg("geometry"))
+        //.doc() = "Drive panels connected to an Adafruit Matrix Bonnet using
+        // the RGB888 memory layout (4 bytes per pixel)"
+        ;
 
-#if 0
-#define pinout(pinoutname, colorspace, pyclassname)                            \
-    py::class_<piomatter<pinoutname, colorspace>, piomatter_base>(m,           \
-                                                                  pyclassname) \
-        .def(py::init<matrix_geometry, py::buffer>())
-
-    pinout(adafruit_matrix_bonnet_pinout, colorspace_rgb888, "AdafruitMatrixBonnetRGB888");
-    //pinout(adafruit_matrix_bonnet_pinout, colorspace_rgb888_packed, "AdafruitMatrixBonnetRGB888Packed");
-#endif
+    m.def("AdafruitMatrixBonnetRGB888Packed",
+          make_piomatter<piomatter::adafruit_matrix_bonnet_pinout,
+                         piomatter::colorspace_rgb888_packed>,
+          py::arg("buffer"), py::arg("geometry"))
+        // .doc() = "Drive panels connected to an Adafruit Matrix Bonnet using
+        // the RGB888 packed memory layout (3 bytes per pixel)"
+        ;
 }
