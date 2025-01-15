@@ -56,7 +56,11 @@ PYBIND11_MODULE(adafruit_raspberry_pi5_piomatter, m) {
         .. autosummary::
            :toctree: _generate
 
-           Piomatter
+           Orientation
+           Geometry
+           PioMatter
+           AdafruitMatrixBonnetRGB888
+           AdafruitMatrixBonnetRGB888Packed
     )pbdoc";
 
     py::enum_<piomatter::orientation>(m, "Orientation")
