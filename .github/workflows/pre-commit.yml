@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: Copyright (c) 2019 Anthony Sottile
+#
+# SPDX-License-Identifier: MIT
+
+name: pre-commit
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Set up repository
+      uses: actions/checkout@v4
+      with:
+        submodules: false
+        show-progress: false
+        fetch-depth: 1
+        persist-credentials: false
+    - name: Set up python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.x
+    - name: Run pre-commit
+      uses: pre-commit/action@v3.0.1
+    - name: Make patch
+      if: failure()
+      run: git diff > ~/pre-commit.patch
+    - name: Upload patch
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: patch
+        path: ~/pre-commit.patch
