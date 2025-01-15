@@ -1,0 +1,36 @@
+name: Pip
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ["ubuntu-latest"]
+        python-version: ["3.11", "3.12", "3.13"]
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+        fetch-depth: 0
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Add requirements
+      run: python -m pip install --upgrade wheel setuptools
+
+    - name: Build and install
+      run: pip install --verbose .

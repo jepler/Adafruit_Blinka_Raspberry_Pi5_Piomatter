@@ -1,0 +1,95 @@
+name: Wheels
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+  release:
+    types:
+      - published
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  build_sdist:
+    name: Build SDist
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+        fetch-depth: 0
+
+    - name: Build SDist
+      run: pipx run build --sdist
+
+    - name: Check metadata
+      run: pipx run twine check dist/*
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: sdist
+        path: dist/*.tar.gz
+        compression-level: 0
+        if-no-files-found: error
+
+
+  build_wheels:
+    name: Wheels on ${{ matrix.os }}${{ matrix.extra }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        arch_linux: ["aarch64"]
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+        fetch-depth: 0
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: all
+
+    - uses: pypa/cibuildwheel@v2.22.0
+      env:
+        CIBW_ARCHS_LINUX: ${{ matrix.arch_linux }}
+        CIBW_BUILD: "cp311-manylinux* cp312-manylinux* cp313-manylinux*"
+        CIBW_MANYLINUX_AARCH64_IMAGE: "manylinux_2_28"
+    - name: Verify clean directory
+      run: git diff --exit-code
+      shell: bash
+
+    - name: Upload wheels
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheel-${{ matrix.os }}${{ matrix.artifact-extra }}
+        path: wheelhouse/*.whl
+        compression-level: 0
+        if-no-files-found: error
+
+
+  upload_all:
+    name: Upload release
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'published'
+
+    steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+
+    - uses: actions/download-artifact@v4
+      with:
+        path: dist
+        merge-multiple: true
+
+    - uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        user: __token__
+        password: ${{ secrets.pypi_password }}
