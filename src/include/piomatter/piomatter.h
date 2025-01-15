@@ -29,6 +29,10 @@ void pio_sm_xfer_data_large(PIO pio, int sm, int direction, size_t size,
 }
 
 struct piomatter_base {
+    piomatter_base() {}
+    piomatter_base(const piomatter_base &) = delete;
+    piomatter_base &operator=(const piomatter_base &) = delete;
+
     virtual ~piomatter_base() {}
     virtual void show() = 0;
 };

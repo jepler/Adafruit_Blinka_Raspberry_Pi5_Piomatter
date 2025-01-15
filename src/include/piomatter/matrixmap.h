@@ -7,6 +7,8 @@ namespace piomatter {
 
 using matrix_map = std::vector<int>;
 
+enum orientation { normal, r180, ccw, cw };
+
 int orientation_normal(int width, int height, int x, int y) {
     return x + width * y;
 }
@@ -41,22 +43,22 @@ void submap(std::vector<int> &result, int width, int height, int start_x,
 } // namespace
 
 template <typename Cb>
-matrix_map make_matrixmap(int width, int height, int n_addr_lines,
+matrix_map make_matrixmap(size_t width, size_t height, size_t n_addr_lines,
                           bool serpentine, const Cb &cb) {
 
-    int panel_height = 2 << n_addr_lines;
+    size_t panel_height = 2 << n_addr_lines;
     if (height % panel_height != 0) {
         throw std::range_error("Height does not evenly divide panel height");
     }
 
-    int half_panel_height = 1 << n_addr_lines;
-    int v_panels = height / panel_height;
-    int pixels_across = width * v_panels;
+    size_t half_panel_height = 1u << n_addr_lines;
+    size_t v_panels = height / panel_height;
+    size_t pixels_across = width * v_panels;
     matrix_map result;
     result.reserve(width * height);
 
-    for (int i = 0; i < half_panel_height; i++) {
-        for (int j = 0; j < pixels_across; j++) {
+    for (size_t i = 0; i < half_panel_height; i++) {
+        for (size_t j = 0; j < pixels_across; j++) {
             int panel_no = j / width;
             int panel_idx = j % width;
             int x, y0, y1;
@@ -80,19 +82,21 @@ matrix_map make_matrixmap(int width, int height, int n_addr_lines,
 
 struct matrix_geometry {
     template <typename Cb>
-    matrix_geometry(int pixels_across, int n_addr_lines, int n_planes,
-                    int width, int height, bool serpentine, const Cb &cb)
+    matrix_geometry(size_t pixels_across, size_t n_addr_lines, int n_planes,
+                    size_t width, size_t height, bool serpentine, const Cb &cb)
         : pixels_across(pixels_across), n_addr_lines(n_addr_lines),
           n_planes(n_planes), width(width),
           height(height), map{make_matrixmap(width, height, n_addr_lines,
                                              serpentine, cb)} {
-        int pixels_down = 2 << n_addr_lines;
+        size_t pixels_down = 2u << n_addr_lines;
         if (map.size() != pixels_down * pixels_across) {
             throw std::range_error(
                 "map size does not match calculated pixel count");
         }
     }
-    int pixels_across, n_addr_lines, n_planes, width, height;
+    size_t pixels_across, n_addr_lines;
+    int n_planes;
+    size_t width, height;
     matrix_map map;
 };
 } // namespace piomatter

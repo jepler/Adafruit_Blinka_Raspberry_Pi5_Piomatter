@@ -32,11 +32,11 @@ struct gamma_lut {
     void convert_rgb888_packed_to_rgb10(std::vector<uint32_t> &result,
                                         std::span<const uint8_t> source) {
         result.resize(source.size() / 3);
-        for (size_t i = 0; i < source.size(); i += 3) {
+        for (size_t i = 0, j = 0; i < source.size(); i += 3) {
             uint32_t r = source[i + 0] & 0xff;
             uint32_t g = source[i + 1] & 0xff;
             uint32_t b = source[i + 2] & 0xff;
-            result[i] = (convert(r) << 20) | (convert(g) << 10) | convert(b);
+            result[j++] = (convert(r) << 20) | (convert(g) << 10) | convert(b);
         }
     }
 
@@ -73,6 +73,9 @@ struct gamma_lut {
 
 struct colorspace_rgb565 {
     using data_type = uint16_t;
+    static constexpr size_t data_size_in_bytes(size_t n_pixels) {
+        return sizeof(data_type) * n_pixels;
+    }
 
     colorspace_rgb565(float gamma = 2.2) : lut{gamma} {}
     gamma_lut lut;
@@ -86,6 +89,9 @@ struct colorspace_rgb565 {
 
 struct colorspace_rgb888 {
     using data_type = uint32_t;
+    static constexpr size_t data_size_in_bytes(size_t n_pixels) {
+        return sizeof(data_type) * n_pixels;
+    }
 
     colorspace_rgb888(float gamma = 2.2) : lut{gamma} {}
     gamma_lut lut;
@@ -99,6 +105,9 @@ struct colorspace_rgb888 {
 
 struct colorspace_rgb888_packed {
     using data_type = uint8_t;
+    static constexpr size_t data_size_in_bytes(size_t n_pixels) {
+        return sizeof(data_type) * n_pixels * 3;
+    }
 
     colorspace_rgb888_packed(float gamma = 2.2) : lut{gamma} {}
     gamma_lut lut;
@@ -198,19 +207,22 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
     };
 
     int last_bit = 0;
-    int prev_addr = 7;
     // illuminate the right row for data in the shift register (the previous
     // address)
+
+    const size_t n_addr = 1u << matrixmap.n_addr_lines;
+    const int n_planes = matrixmap.n_planes;
+    constexpr size_t n_bits = 10u;
+    unsigned offset = n_bits - n_planes;
+    const size_t pixels_across = matrixmap.pixels_across;
+
+    size_t prev_addr = n_addr - 1;
     uint32_t addr_bits = calc_addr_bits(prev_addr);
 
-    const auto n_addr = 1u << matrixmap.n_addr_lines;
-    const auto n_planes = matrixmap.n_planes;
-    constexpr auto n_bits = 10u;
-    unsigned offset = n_bits - n_planes;
-    const auto pixels_across = matrixmap.pixels_across;
-
-    for (int addr = 0; addr < n_addr; addr++) {
+    for (size_t addr = 0; addr < n_addr; addr++) {
+        // printf("addr=%zu/%zu\n", addr, n_addr);
         for (int bit = n_planes - 1; bit >= 0; bit--) {
+            // printf("bit=%d/%d\n", bit, n_planes);
             uint32_t r = 1 << (20 + offset + bit);
             uint32_t g = 1 << (10 + offset + bit);
             uint32_t b = 1 << (0 + offset + bit);
@@ -223,7 +235,7 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
 
             prep_data(2 * pixels_across);
             auto mapiter = matrixmap.map.begin() + 2 * addr * pixels_across;
-            for (int x = 0; x < pixels_across; x++) {
+            for (size_t x = 0; x < pixels_across; x++) {
                 assert(mapiter != matrixmap.map.end());
                 auto pixel0 = pixels[*mapiter++];
                 auto r0 = pixel0 & r;

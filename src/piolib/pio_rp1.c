@@ -794,7 +794,7 @@ static void rp1_gpio_set_drive_strength(PIO pio, uint gpio,
 
 static void rp1_pio_gpio_init(PIO pio, uint pin) {
     valid_params_if(PIO, pin < RP1_PIO_GPIO_COUNT);
-    rp1_gpio_set_function(pio, pin, (gpio_function)RP1_GPIO_FUNC_PIO);
+    rp1_gpio_set_function(pio, pin, (enum gpio_function)RP1_GPIO_FUNC_PIO);
 }
 
 PIO rp1_create_instance(PIO_CHIP_T *chip, uint index) {
