@@ -18,7 +18,7 @@ constexpr uint32_t command_delay = 0;
 struct gamma_lut {
     gamma_lut(double exponent = 2.2) {
         for (int i = 0; i < 256; i++) {
-            auto v = std::max(i, int(round(1023 * pow(i / 255, exponent))));
+            auto v = std::max(i, int(round(1023 * pow(i / 255., exponent))));
             lut[i] = v;
         }
     }
