@@ -8,7 +8,9 @@
 namespace piomatter {
 
 constexpr unsigned DATA_OVERHEAD = 3;
-constexpr unsigned CLOCKS_PER_DATA = 2;
+// this is ... flatly wrong!? but it's the number that makes the ramp intensity
+// correct to my eye
+constexpr unsigned CLOCKS_PER_DATA = 128;
 constexpr unsigned DELAY_OVERHEAD = 5;
 constexpr unsigned CLOCKS_PER_DELAY = 1;
 
@@ -18,7 +20,7 @@ constexpr uint32_t command_delay = 0;
 struct gamma_lut {
     gamma_lut(double exponent = 2.2) {
         for (int i = 0; i < 256; i++) {
-            auto v = std::max(i, int(round(1023 * pow(i / 255, exponent))));
+            auto v = std::max(i, int(round(1023 * pow(i / 255., exponent))));
             lut[i] = v;
         }
     }
@@ -159,10 +161,21 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
         result.push_back(d);
     };
 
-    auto do_data_delay = [&](uint32_t d, uint32_t delay) {
+    int32_t active_time;
+
+    auto do_data_active = [&active_time, &do_data](uint32_t d) {
+        bool active = active_time > 0;
+        active_time--;
+        d |= active ? pinout::oe_active : pinout::oe_inactive;
+        do_data(d);
+    };
+
+    auto do_data_delay = [&prep_data, &do_data, &do_delay](uint32_t d,
+                                                           int32_t delay) {
         prep_data(1);
         do_data(d);
-        do_delay(delay);
+        if (delay > 0)
+            do_delay(delay);
     };
 
     auto calc_addr_bits = [](int addr) {
@@ -184,11 +197,10 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
         return data;
     };
 
-    auto add_pixels = [&do_data, &result](uint32_t addr_bits, bool r0, bool g0,
-                                          bool b0, bool r1, bool g1, bool b1,
-                                          bool active) {
-        uint32_t data =
-            (active ? pinout::oe_active : pinout::oe_inactive) | addr_bits;
+    auto add_pixels = [&do_data_active, &result](uint32_t addr_bits, bool r0,
+                                                 bool g0, bool b0, bool r1,
+                                                 bool g1, bool b1) {
+        uint32_t data = addr_bits;
         if (r0)
             data |= (1 << pinout::PIN_RGB[0]);
         if (g0)
@@ -202,8 +214,8 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
         if (b1)
             data |= (1 << pinout::PIN_RGB[5]);
 
-        do_data(data);
-        do_data(data | pinout::clk_bit);
+        do_data_active(data);
+        do_data_active(data | pinout::clk_bit);
     };
 
     int last_bit = 0;
@@ -230,7 +242,7 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
             // the shortest /OE we can do is one DATA_OVERHEAD...
             // TODO: should make sure desired duration of MSB is at least
             // `pixels_across`
-            uint32_t desired_duration = 1 << last_bit;
+            active_time = 1 << last_bit;
             last_bit = bit;
 
             prep_data(2 * pixels_across);
@@ -247,17 +259,12 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
                 auto g1 = pixel1 & g;
                 auto b1 = pixel1 & b;
 
-                add_pixels(addr_bits, r0, g0, b0, r1, g1, b1,
-                           x < desired_duration);
+                add_pixels(addr_bits, r0, g0, b0, r1, g1, b1);
             }
 
-            // hold /OE low until desired time has elapsed to illuminate the
-            // LAST line
-            int remain = desired_duration - pixels_across;
-            if (remain > 0) {
-                do_data_delay(addr_bits | pinout::oe_active,
-                              remain * CLOCKS_PER_DATA - DELAY_OVERHEAD);
-            }
+            do_data_delay(addr_bits | pinout::oe_active,
+                          active_time * CLOCKS_PER_DATA / CLOCKS_PER_DELAY -
+                              DELAY_OVERHEAD);
 
             do_data_delay(addr_bits | pinout::oe_inactive,
                           pinout::post_oe_delay);
