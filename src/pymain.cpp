@@ -153,6 +153,14 @@ update the data actually displayed on the panel. Internally, the
 data is triple-buffered to prevent tearing.
 )pbdoc");
 
+    m.def("AdafruitMatrixBonnetRGB565",
+          make_piomatter<piomatter::adafruit_matrix_bonnet_pinout,
+                         piomatter::colorspace_rgb565>,
+          py::arg("buffer"), py::arg("geometry"))
+        //.doc() = "Drive panels connected to an Adafruit Matrix Bonnet using
+        // the RGB565 memory layout (4 bytes per pixel)"
+        ;
+
     m.def("AdafruitMatrixBonnetRGB888",
           make_piomatter<piomatter::adafruit_matrix_bonnet_pinout,
                          piomatter::colorspace_rgb888>,
