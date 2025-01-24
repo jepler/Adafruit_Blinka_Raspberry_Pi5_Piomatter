@@ -7,12 +7,10 @@
 
 namespace piomatter {
 
-constexpr unsigned DATA_OVERHEAD = 3;
-// this is ... flatly wrong!? but it's the number that makes the ramp intensity
-// correct to my eye
-constexpr unsigned CLOCKS_PER_DATA = 128;
-constexpr unsigned DELAY_OVERHEAD = 5;
-constexpr unsigned CLOCKS_PER_DELAY = 1;
+constexpr int DATA_OVERHEAD = 3;
+constexpr int CLOCKS_PER_DATA = 2;
+constexpr int DELAY_OVERHEAD = 5;
+constexpr int CLOCKS_PER_DELAY = 1;
 
 constexpr uint32_t command_data = 1u << 31;
 constexpr uint32_t command_delay = 0;
@@ -139,12 +137,12 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
 
     int data_count = 0;
 
-    auto do_delay = [&](uint32_t delay) {
-        if (delay == 0)
-            return;
+    auto do_data_delay = [&](uint32_t data, int32_t delay) {
+        delay = std::max((delay / CLOCKS_PER_DELAY) - DELAY_OVERHEAD, 1);
         assert(delay < 1000000);
         assert(!data_count);
         result.push_back(command_delay | (delay ? delay - 1 : 0));
+        result.push_back(data);
     };
 
     auto prep_data = [&data_count, &result](uint32_t n) {
@@ -155,27 +153,15 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
         data_count = n;
     };
 
-    auto do_data = [&](uint32_t d) {
-        assert(data_count);
-        data_count--;
-        result.push_back(d);
-    };
-
     int32_t active_time;
 
-    auto do_data_active = [&active_time, &do_data](uint32_t d) {
+    auto do_data_clk_active = [&active_time, &data_count, &result](uint32_t d) {
         bool active = active_time > 0;
         active_time--;
         d |= active ? pinout::oe_active : pinout::oe_inactive;
-        do_data(d);
-    };
-
-    auto do_data_delay = [&prep_data, &do_data, &do_delay](uint32_t d,
-                                                           int32_t delay) {
-        prep_data(1);
-        do_data(d);
-        if (delay > 0)
-            do_delay(delay);
+        assert(data_count);
+        data_count--;
+        result.push_back(d);
     };
 
     auto calc_addr_bits = [](int addr) {
@@ -197,9 +183,9 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
         return data;
     };
 
-    auto add_pixels = [&do_data_active, &result](uint32_t addr_bits, bool r0,
-                                                 bool g0, bool b0, bool r1,
-                                                 bool g1, bool b1) {
+    auto add_pixels = [&do_data_clk_active,
+                       &result](uint32_t addr_bits, bool r0, bool g0, bool b0,
+                                bool r1, bool g1, bool b1) {
         uint32_t data = addr_bits;
         if (r0)
             data |= (1 << pinout::PIN_RGB[0]);
@@ -214,8 +200,7 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
         if (b1)
             data |= (1 << pinout::PIN_RGB[5]);
 
-        do_data_active(data);
-        do_data_active(data | pinout::clk_bit);
+        do_data_clk_active(data);
     };
 
     int last_bit = 0;
@@ -245,7 +230,7 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
             active_time = 1 << last_bit;
             last_bit = bit;
 
-            prep_data(2 * pixels_across);
+            prep_data(pixels_across);
             auto mapiter = matrixmap.map.begin() + 2 * addr * pixels_across;
             for (size_t x = 0; x < pixels_across; x++) {
                 assert(mapiter != matrixmap.map.end());

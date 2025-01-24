@@ -1,29 +1,26 @@
-import sys
-from contextlib import contextmanager
+import io
+import pathlib
+from contextlib import redirect_stdout
 
 import adafruit_pioasm
 import click
 
 
-@contextmanager
-def temporary_stdout(filename):
-    old_stdout = sys.stdout
-    try:
-        with open(filename, "w", encoding="utf-8") as sys.stdout:
-            yield sys.stdout
-    finally:
-        sys.stdout = old_stdout
-
 @click.command
 @click.argument("infile")
 @click.argument("outfile")
 def main(infile, outfile):
-    program_name = infile.rpartition("/")[2].partition(".")[0]
-    print(program_name)
+    program_name = pathlib.Path(infile).stem
     program = adafruit_pioasm.Program.from_file(infile, build_debuginfo=True)
 
-    with temporary_stdout(outfile):
+    c_program = io.StringIO()
+    with redirect_stdout(c_program):
         program.print_c_program(program_name)
+
+    with open(outfile, "w", encoding="utf-8") as out:
+        print("#pragma once", file=out)
+        print("", file=out)
+        print(c_program.getvalue().rstrip().replace("True", "true"), file=out)
 
 if __name__ == '__main__':
     main()

@@ -3,17 +3,20 @@
 ; 0 ddd......ddd: 31-bit delay
 ; 1 ccc......ccc: 31 bit data count
 
+.side_set 1 opt
 .wrap_target
 top:
     out x, 1
     out y, 31
-    jmp !x delay_loop
+    jmp !x do_delay
 
 data_loop:
     out pins, 32
-    jmp y--, data_loop
+    jmp y--, data_loop  side 1 ; assert clk bit
 .wrap
 
+do_delay:
+    out pins, 32
 delay_loop:
     jmp y--, delay_loop
     jmp top

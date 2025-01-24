@@ -32,4 +32,4 @@ while True:
     t1 = time.monotonic()
     dt = t1 - t0
     fps = nimages/dt
-    print(f"{nimages} frames in {dt}s, {fps}fps")
+    print(f"{nimages} frames in {dt}s, {fps}fps [{matrix.fps}]")

@@ -90,7 +90,6 @@ void test_pattern(int offs) {
 }
 
 static uint64_t monotonicns64() {
-
     struct timespec tp;
     clock_gettime(CLOCK_MONOTONIC, &tp);
     return tp.tv_sec * UINT64_C(1000000000) + tp.tv_nsec;

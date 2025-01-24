@@ -12,6 +12,12 @@
 
 namespace piomatter {
 
+static uint64_t monotonicns64() {
+    struct timespec tp;
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+    return tp.tv_sec * UINT64_C(1000000000) + tp.tv_nsec;
+}
+
 constexpr size_t MAX_XFER = 65532;
 
 void pio_sm_xfer_data_large(PIO pio, int sm, int direction, size_t size,
@@ -35,6 +41,8 @@ struct piomatter_base {
 
     virtual ~piomatter_base() {}
     virtual void show() = 0;
+
+    double fps;
 };
 
 template <class pinout = adafruit_matrix_bonnet_pinout,
@@ -111,11 +119,21 @@ struct piomatter : piomatter_base {
         pio_sm_config c = pio_get_default_sm_config();
         sm_config_set_wrap(&c, offset + protomatter_wrap_target,
                            offset + protomatter_wrap);
+        // 1 side-set pin
+        sm_config_set_sideset(&c, 2, true, false);
         sm_config_set_out_shift(&c, /* shift_right= */ false,
                                 /* auto_pull = */ true, 32);
         sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
-        sm_config_set_clkdiv(&c, 1.0);
+        // Due to https://github.com/raspberrypi/utils/issues/116 it's not
+        // possible to keep the RP1 state machine fed at high rates. This target
+        // frequency is approximately the best sustainable clock with current
+        // FW & kernel.
+        constexpr double target_freq =
+            2700000 * 2; // 2.7MHz pixel clock, 2 PIO cycles per pixel
+        double div = clock_get_hz(clk_sys) / target_freq;
+        sm_config_set_clkdiv(&c, div);
         sm_config_set_out_pins(&c, 0, 28);
+        sm_config_set_sideset_pins(&c, pinout::PIN_CLK);
         pio_sm_init(pio, sm, offset, &c);
         pio_sm_set_enabled(pio, sm, true);
 
@@ -146,6 +164,8 @@ struct piomatter : piomatter_base {
         size_t datasize = 0;
         int old_buffer_idx = buffer_manager::no_buffer;
         int buffer_idx;
+        uint64_t t0, t1;
+        t0 = monotonicns64();
         while ((buffer_idx = manager.get_filled_buffer()) !=
                buffer_manager::exit_request) {
             if (buffer_idx != buffer_manager::no_buffer) {
@@ -160,6 +180,11 @@ struct piomatter : piomatter_base {
             if (datasize) {
                 pio_sm_xfer_data_large(pio, sm, PIO_DIR_TO_SM, datasize,
                                        (uint32_t *)databuf);
+                t1 = monotonicns64();
+                if (t0 != t1) {
+                    fps = 1e9 / (t1 - t0);
+                }
+                t0 = t1;
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
