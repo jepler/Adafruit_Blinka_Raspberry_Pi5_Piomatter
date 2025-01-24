@@ -111,6 +111,8 @@ struct piomatter : piomatter_base {
         pio_sm_config c = pio_get_default_sm_config();
         sm_config_set_wrap(&c, offset + protomatter_wrap_target,
                            offset + protomatter_wrap);
+        // 1 side-set pin
+        sm_config_set_sideset(&c, 2, true, false);
         sm_config_set_out_shift(&c, /* shift_right= */ false,
                                 /* auto_pull = */ true, 32);
         sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
@@ -119,10 +121,11 @@ struct piomatter : piomatter_base {
         // frequency is approximately the best sustainable clock with current
         // FW & kernel.
         constexpr double target_freq =
-            2700000; // 2.7MHz PIO clock -> 1.35MHz pixel clock
+            2700000 * 2; // 2.7MHz pixel clock, 2 PIO cycles per pixel
         double div = clock_get_hz(clk_sys) / target_freq;
         sm_config_set_clkdiv(&c, div);
         sm_config_set_out_pins(&c, 0, 28);
+        sm_config_set_sideset_pins(&c, pinout::PIN_CLK);
         pio_sm_init(pio, sm, offset, &c);
         pio_sm_set_enabled(pio, sm, true);
 
