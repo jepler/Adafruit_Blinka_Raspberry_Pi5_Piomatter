@@ -12,6 +12,12 @@
 
 namespace piomatter {
 
+static uint64_t monotonicns64() {
+    struct timespec tp;
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+    return tp.tv_sec * UINT64_C(1000000000) + tp.tv_nsec;
+}
+
 constexpr size_t MAX_XFER = 65532;
 
 void pio_sm_xfer_data_large(PIO pio, int sm, int direction, size_t size,
@@ -35,6 +41,8 @@ struct piomatter_base {
 
     virtual ~piomatter_base() {}
     virtual void show() = 0;
+
+    double fps;
 };
 
 template <class pinout = adafruit_matrix_bonnet_pinout,
@@ -156,6 +164,8 @@ struct piomatter : piomatter_base {
         size_t datasize = 0;
         int old_buffer_idx = buffer_manager::no_buffer;
         int buffer_idx;
+        uint64_t t0, t1;
+        t0 = monotonicns64();
         while ((buffer_idx = manager.get_filled_buffer()) !=
                buffer_manager::exit_request) {
             if (buffer_idx != buffer_manager::no_buffer) {
@@ -170,6 +180,11 @@ struct piomatter : piomatter_base {
             if (datasize) {
                 pio_sm_xfer_data_large(pio, sm, PIO_DIR_TO_SM, datasize,
                                        (uint32_t *)databuf);
+                t1 = monotonicns64();
+                if (t0 != t1) {
+                    fps = 1e9 / (t1 - t0);
+                }
+                t0 = t1;
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }

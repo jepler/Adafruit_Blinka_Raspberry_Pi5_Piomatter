@@ -18,6 +18,7 @@ struct PyPiomatter {
     std::unique_ptr<piomatter::piomatter_base> matter;
 
     void show() { matter->show(); }
+    double fps() const { return matter->fps; }
 };
 
 template <typename pinout, typename colorspace>
@@ -151,6 +152,9 @@ Update the displayed image
 After modifying the content of the framebuffer, call this method to
 update the data actually displayed on the panel. Internally, the
 data is triple-buffered to prevent tearing.
+)pbdoc")
+        .def_property_readonly("fps", &PyPiomatter::fps, R"pbdoc(
+The approximate number of matrix refreshes per second.
 )pbdoc");
 
     m.def("AdafruitMatrixBonnetRGB565",
