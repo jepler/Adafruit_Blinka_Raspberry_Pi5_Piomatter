@@ -114,7 +114,14 @@ struct piomatter : piomatter_base {
         sm_config_set_out_shift(&c, /* shift_right= */ false,
                                 /* auto_pull = */ true, 32);
         sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
-        sm_config_set_clkdiv(&c, 1.0);
+        // Due to https://github.com/raspberrypi/utils/issues/116 it's not
+        // possible to keep the RP1 state machine fed at high rates. This target
+        // frequency is approximately the best sustainable clock with current
+        // FW & kernel.
+        constexpr double target_freq =
+            2700000; // 2.7MHz PIO clock -> 1.35MHz pixel clock
+        double div = clock_get_hz(clk_sys) / target_freq;
+        sm_config_set_clkdiv(&c, div);
         sm_config_set_out_pins(&c, 0, 28);
         pio_sm_init(pio, sm, offset, &c);
         pio_sm_set_enabled(pio, sm, true);

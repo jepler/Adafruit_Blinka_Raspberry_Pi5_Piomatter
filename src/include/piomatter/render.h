@@ -8,9 +8,7 @@
 namespace piomatter {
 
 constexpr unsigned DATA_OVERHEAD = 3;
-// this is ... flatly wrong!? but it's the number that makes the ramp intensity
-// correct to my eye
-constexpr unsigned CLOCKS_PER_DATA = 128;
+constexpr unsigned CLOCKS_PER_DATA = 2;
 constexpr unsigned DELAY_OVERHEAD = 5;
 constexpr unsigned CLOCKS_PER_DELAY = 1;
 
