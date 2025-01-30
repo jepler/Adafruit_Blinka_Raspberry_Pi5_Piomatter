@@ -27,7 +27,7 @@ Installing from pip:
 System setup
 ------------
 
-If `ls -l /dev/pio0` reports that the file is not found, you may need to update your Pi 5 firmware to one with PIO support and make sure that you are running a suitably recent kernel. If `ls -l /dev/pio0` reports that the file is owned by root and group root, you should add the following to /etc/udev/rules/99-com.rules:
+If `ls -l /dev/pio0` reports that the file is not found, you may need to update your Pi 5 firmware to one with PIO support and make sure that you are running a suitably recent kernel. If `ls -l /dev/pio0` reports that the file is owned by root and group root, you should add the following to /etc/udev/rules.d/99-com.rules:
 
 ```
 SUBSYSTEM=="*-pio", GROUP="gpio", MODE="0660"
