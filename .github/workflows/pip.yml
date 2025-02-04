@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: ["ubuntu-latest"]
+        platform: ["ubuntu-24.04-arm"]
         python-version: ["3.11", "3.12", "3.13"]
 
     runs-on: ${{ matrix.platform }}
