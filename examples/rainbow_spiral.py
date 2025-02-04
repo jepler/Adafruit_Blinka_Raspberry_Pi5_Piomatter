@@ -17,14 +17,14 @@ from PIL import Image, ImageDraw
 
 width = 64
 height = 32
-pen_radius = 2
+pen_radius = 1
 
 
 canvas = Image.new('RGB', (width, height), (0, 0, 0))
 draw = ImageDraw.Draw(canvas)
 
 geometry = adafruit_raspberry_pi5_piomatter.Geometry(width=width, height=height, n_addr_lines=4,
-                                                     rotation=adafruit_raspberry_pi5_piomatter.Orientation.R180)
+                                                     rotation=adafruit_raspberry_pi5_piomatter.Orientation.Normal)
 framebuffer = np.asarray(canvas) + 0  # Make a mutable copy
 matrix = adafruit_raspberry_pi5_piomatter.AdafruitMatrixBonnetRGB888Packed(framebuffer, geometry)
 
@@ -66,22 +66,22 @@ try:
     while True:
         for step in range(step_count):
             step_down_size = step * (pen_radius* 2) + (2 * step)
-            for x in range(pen_radius + step_down_size, width - pen_radius - step_down_size - 1, 2):
+            for x in range(pen_radius + step_down_size, width - pen_radius - step_down_size - 1):
                 color_index = (color_index + 2) % 256
                 color = darken_color(rainbowio.colorwheel(color_index), darkness_factor) if not clearing else 0x000000
                 draw.circle((x, pen_radius + step_down_size), pen_radius, color)
                 update_matrix()
-            for y in range(pen_radius + step_down_size, height - pen_radius - step_down_size - 1, 2):
+            for y in range(pen_radius + step_down_size, height - pen_radius - step_down_size - 1):
                 color_index = (color_index + 2) % 256
                 color = darken_color(rainbowio.colorwheel(color_index), darkness_factor) if not clearing else 0x000000
                 draw.circle((width - pen_radius - step_down_size -1, y), pen_radius, color)
                 update_matrix()
-            for x in range(width - pen_radius - step_down_size - 1, pen_radius + step_down_size, -2):
+            for x in range(width - pen_radius - step_down_size - 1, pen_radius + step_down_size, -1):
                 color_index = (color_index + 2) % 256
                 color = darken_color(rainbowio.colorwheel(color_index), darkness_factor) if not clearing else 0x000000
                 draw.circle((x, height - pen_radius - step_down_size - 1), pen_radius, color)
                 update_matrix()
-            for y in range(height - pen_radius - step_down_size - 1, pen_radius + ((step+1) * (pen_radius* 2) + (2 * (step+1))) -1, -2):
+            for y in range(height - pen_radius - step_down_size - 1, pen_radius + ((step+1) * (pen_radius* 2) + (2 * (step+1))) -1, -1):
                 color_index = (color_index + 2) % 256
                 color = darken_color(rainbowio.colorwheel(color_index), darkness_factor) if not clearing else 0x000000
                 draw.circle((pen_radius + step_down_size, y), pen_radius, color)
