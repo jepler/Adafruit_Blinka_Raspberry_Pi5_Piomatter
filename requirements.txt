@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Tim Cocks for Adafruit Industries
+#
+# SPDX-License-Identifier: Unlicense
+Adafruit-Blinka
+adafruit-circuitpython-pioasm
+numpy
+pillow
