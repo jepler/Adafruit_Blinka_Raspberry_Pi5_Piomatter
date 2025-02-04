@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw
 
 width = 64
 height = 32
-pen_radius = 1.5
+pen_radius = 2
 
 
 canvas = Image.new('RGB', (width, height), (0, 0, 0))
