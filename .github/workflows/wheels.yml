@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build_sdist:
     name: Build SDist
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
     - uses: actions/checkout@v4
       with:
@@ -42,18 +42,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-latest"]
+        os: ["ubuntu-24.04-arm"]
         arch_linux: ["aarch64"]
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: true
         fetch-depth: 0
-
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: all
 
     - uses: pypa/cibuildwheel@v2.22.0
       env:
