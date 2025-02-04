@@ -31,17 +31,17 @@ xoffset = 0
 
 
 if len(sys.argv) >= 2:
-    width = int(sys.argv[2])
+    width = int(sys.argv[1])
 else:
     width = 64
 
 if len(sys.argv) >= 3:
-    height = int(sys.argv[3])
+    height = int(sys.argv[2])
 else:
     height = 32
 
 if len(sys.argv) >= 4:
-    rotation = int(sys.argv[4])
+    rotation = int(sys.argv[3])
     if rotation == 90:
         rotation = adafruit_raspberry_pi5_piomatter.Orientation.CW
     elif rotation == 180:
@@ -72,7 +72,7 @@ with open("/sys/class/graphics/fb0/stride") as f:
 linux_framebuffer = np.memmap('/dev/fb0',mode='r', shape=(screeny, stride // bytes_per_pixel), dtype=dtype)
 
 
-geometry = adafruit_raspberry_pi5_piomatter.Geometry(width=width, height=height, n_addr_lines=4, rotation=adafruit_raspberry_pi5_piomatter.Orientation.Normal)
+geometry = adafruit_raspberry_pi5_piomatter.Geometry(width=width, height=height, n_addr_lines=4, rotation=rotation)
 matrix_framebuffer = np.zeros(shape=(geometry.height, geometry.width), dtype=dtype)
 matrix = adafruit_raspberry_pi5_piomatter.AdafruitMatrixBonnetRGB565(matrix_framebuffer, geometry)
 
