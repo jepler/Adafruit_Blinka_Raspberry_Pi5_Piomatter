@@ -1,18 +1,58 @@
 #!/usr/bin/python3
 """
-Mirror a scaled copy of the framebuffer to a 64x32 matrix
+Mirror a scaled copy of the framebuffer to 64x32 matrices,
 
 The upper left corner of the framebuffer is displayed until the user hits ctrl-c.
+
+Control scale, matrix size, and orientation with command line arguments.
+
+python fbmirror_scaled.py [scale] [width] [height] [orientation]
+
+    scale int: How many times to scale down the display framebuffer. Default is 3.
+    width int: Total width of matrices in pixels. Default is 64.
+    height int: Total height of matrices in pixels. Default is 32.
+    orientation int: Orientation in degrees, must be 0, 90, 180, or 270.
+        Default is 0 or Normal orientation.
 
 The `/dev/fb0` special file will exist if a monitor is plugged in at boot time,
 or if `/boot/firmware/cmdline.txt` specifies a resolution such as
 `...  video=HDMI-A-1:640x480M@60D`.
 """
-
+import sys
 
 import adafruit_raspberry_pi5_piomatter
 import numpy as np
 import PIL.Image as Image
+
+if len(sys.argv) >= 2:
+    scale = int(sys.argv[1])
+else:
+    scale = 3
+
+if len(sys.argv) >= 3:
+    width = int(sys.argv[2])
+else:
+    width = 64
+
+if len(sys.argv) >= 4:
+    height = int(sys.argv[3])
+else:
+    height = 32
+
+if len(sys.argv) >= 5:
+    rotation = int(sys.argv[4])
+    if rotation == 90:
+        rotation = adafruit_raspberry_pi5_piomatter.Orientation.CW
+    elif rotation == 180:
+        rotation = adafruit_raspberry_pi5_piomatter.Orientation.R180
+    elif rotation == 270:
+        rotation = adafruit_raspberry_pi5_piomatter.Orientation.CCW
+    elif rotation == 0:
+        rotation = adafruit_raspberry_pi5_piomatter.Orientation.Normal
+    else:
+        raise ValueError("Invalid rotation. Must be 0, 90, 180, or 270.")
+else:
+    rotation = adafruit_raspberry_pi5_piomatter.Orientation.Normal
 
 with open("/sys/class/graphics/fb0/virtual_size") as f:
     screenx, screeny = [int(word) for word in f.read().split(",")]
@@ -32,11 +72,8 @@ linux_framebuffer = np.memmap('/dev/fb0',mode='r', shape=(screeny, stride // byt
 
 xoffset = 0
 yoffset = 0
-width = 64
-height = 32
-scale = 3
 
-geometry = adafruit_raspberry_pi5_piomatter.Geometry(width=width, height=height, n_addr_lines=4, rotation=adafruit_raspberry_pi5_piomatter.Orientation.Normal)
+geometry = adafruit_raspberry_pi5_piomatter.Geometry(width=width, height=height, n_addr_lines=4, rotation=rotation)
 matrix_framebuffer = np.zeros(shape=(geometry.height, geometry.width, 3), dtype=np.uint8)
 matrix = adafruit_raspberry_pi5_piomatter.AdafruitMatrixBonnetRGB888Packed(matrix_framebuffer, geometry)
 

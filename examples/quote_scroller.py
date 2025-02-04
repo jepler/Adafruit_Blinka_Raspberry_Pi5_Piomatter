@@ -1,47 +1,62 @@
-import requests
-from PIL import ImageFont, ImageDraw, Image
+#!/usr/bin/python3
+# SPDX-FileCopyrightText: 2025 Tim Cocks for Adafruit Industries
+#
+# SPDX-License-Identifier: MIT
+"""
+Display quote from the Adafruit quotes API as text scrolling across the
+matrices.
+
+Run like this:
+
+$ python quote_scroller.py
+
+"""
+
 import adafruit_raspberry_pi5_piomatter
 import numpy as np
-import time
+import requests
+from PIL import Image, ImageDraw, ImageFont
 
+# 128px for 2x1 matrices. Change to 64 if you're using a single matrix.
+total_width = 128
+total_height = 32
 
-xoffset = 0
-yoffset = 0
-
-
-width = 128
-height = 64
-
+bottom_half_shift_compensation = 1
 
 # Load the font
-font = ImageFont.truetype("LindenHill-webfont.ttf", 26)  # Replace "arial.ttf" with your desired font file
-
-# Text to measure
-#text = "Hello, World!"
-
+font = ImageFont.truetype("LindenHill-webfont.ttf", 26)
 
 quote_resp = requests.get("https://www.adafruit.com/api/quotes.php").json()
 
 text = f'{quote_resp[0]["text"]} - {quote_resp[0]["author"]}'
+#text = "Sometimes you just want to use hardcoded strings. - Unknown"
 
-#print(font.getbbox(text))
 x, y, text_width, text_height = font.getbbox(text)
 
 full_txt_img = Image.new("RGB", (int(text_width) + 6, int(text_height) + 6), (0, 0, 0))
 draw = ImageDraw.Draw(full_txt_img)
-draw.text((3, 3), text, font=font, fill=(255, 0, 255))
-#img.save("quote.png")
+draw.text((3, 0), text, font=font, fill=(0, 128, 128))
+full_txt_img.save("quote.png")
 
-single_frame_img = Image.new("RGB", (width, height), (0, 0, 0))
+single_frame_img = Image.new("RGB", (total_width, total_height), (0, 0, 0))
 
-geometry = adafruit_raspberry_pi5_piomatter.Geometry(width=width, height=height, n_addr_lines=4, rotation=adafruit_raspberry_pi5_piomatter.Orientation.R180)
+geometry = adafruit_raspberry_pi5_piomatter.Geometry(width=total_width, height=total_height, n_addr_lines=4, rotation=adafruit_raspberry_pi5_piomatter.Orientation.R180)
 framebuffer = np.asarray(single_frame_img) + 0  # Make a mutable copy
 
 matrix = adafruit_raspberry_pi5_piomatter.AdafruitMatrixBonnetRGB888Packed(framebuffer, geometry)
 
+print("Ctrl-C to exit")
+while True:
+    for x_pixel in range(-total_width-1,full_txt_img.width):
+        if bottom_half_shift_compensation == 0:
+            # full paste
+            single_frame_img.paste(full_txt_img.crop((x_pixel, 0, x_pixel + total_width, total_height)), (0, 0))
 
-for x_pixel in text_width:
-    single_frame_img.paste(full_txt_img.crop(x_pixel, 0, width, height))
-    framebuffer[:] = np.asarray(single_frame_img)
-    matrix.show()
-    time.sleep(0.01)
+        else:
+            # top half
+            single_frame_img.paste(full_txt_img.crop((x_pixel, 0, x_pixel + total_width, total_height//2)), (0, 0))
+            # bottom half shift right 1 px
+            single_frame_img.paste(full_txt_img.crop((x_pixel, total_height//2, x_pixel + total_width, total_height)), (bottom_half_shift_compensation, total_height//2))
+
+        framebuffer[:] = np.asarray(single_frame_img)
+        matrix.show()
