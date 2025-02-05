@@ -12,6 +12,10 @@ Adafruit-Blinka-Raspberry-Pi5-Piomatter
 [actions-wheels-link]:     https://github.com/adafruit/Adafruit_Blinka_Raspberry_Pi5_Piomatter/actions?query=workflow%3AWheels
 [actions-wheels-badge]:    https://github.com/adafruit/Adafruit_Blinka_Raspberry_Pi5_Piomatter/workflows/Wheels/badge.svg
 
+Learn Guide
+-----------
+[RGB Matrix Panels With Raspberry Pi 5](https://learn.adafruit.com/rgb-matrix-panels-with-raspberry-pi-5)
+
 Installation
 ------------
 
