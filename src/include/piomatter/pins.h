@@ -40,5 +40,4 @@ struct adafruit_matrix_bonnet_pinout_bgr {
     static constexpr uint32_t post_addr_delay = 500;
 };
 
-
 } // namespace piomatter
