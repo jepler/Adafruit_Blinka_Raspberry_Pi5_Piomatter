@@ -1,4 +1,4 @@
-./*.pio.h
+/*.pio.h
 protodemo
-./build
+/build
 *.egg-info
