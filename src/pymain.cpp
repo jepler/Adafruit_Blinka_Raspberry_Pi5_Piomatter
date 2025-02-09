@@ -131,7 +131,7 @@ PYBIND11_MODULE(adafruit_raspberry_pi5_piomatter, m) {
         m, "Pinout", "Describes the pins used for the connection to the matrix")
         .value("AdafruitMatrixBonnet", Pinout::AdafruitMatrixBonnet,
                "Adafruit Matrix Bonnet or Matrix Hat")
-        .value("AdafruitMatrixBonnetBGR", Pinout::AdafruitMatrixBonnet,
+        .value("AdafruitMatrixBonnetBGR", Pinout::AdafruitMatrixBonnetBGR,
                "Adafruit Matrix Bonnet or Matrix Hat with BGR color order")
         .value("AdafruitMatrixHat", Pinout::AdafruitMatrixBonnet,
                "Adafruit Matrix Bonnet or Matrix Hat")
