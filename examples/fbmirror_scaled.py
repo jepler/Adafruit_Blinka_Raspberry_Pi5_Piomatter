@@ -36,12 +36,11 @@ The `/dev/fb0` special file will exist if a monitor is plugged in at boot time,
 or if `/boot/firmware/cmdline.txt` specifies a resolution such as
 `...  video=HDMI-A-1:640x480M@60D`.
 """
-import sys
 
 import adafruit_raspberry_pi5_piomatter as piomatter
+import click
 import numpy as np
 import PIL.Image as Image
-import click
 import piomatter_click
 
 with open("/sys/class/graphics/fb0/virtual_size") as f:
@@ -90,4 +89,3 @@ def main(xoffset, yoffset, scale, width, height, serpentine, rotation, pinout, n
 
 if __name__ == '__main__':
     main()
-
