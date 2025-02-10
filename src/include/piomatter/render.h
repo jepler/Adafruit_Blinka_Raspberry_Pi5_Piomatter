@@ -183,26 +183,6 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
         return data;
     };
 
-    auto add_pixels = [&do_data_clk_active,
-                       &result](uint32_t addr_bits, bool r0, bool g0, bool b0,
-                                bool r1, bool g1, bool b1) {
-        uint32_t data = addr_bits;
-        if (r0)
-            data |= (1 << pinout::PIN_RGB[0]);
-        if (g0)
-            data |= (1 << pinout::PIN_RGB[1]);
-        if (b0)
-            data |= (1 << pinout::PIN_RGB[2]);
-        if (r1)
-            data |= (1 << pinout::PIN_RGB[3]);
-        if (g1)
-            data |= (1 << pinout::PIN_RGB[4]);
-        if (b1)
-            data |= (1 << pinout::PIN_RGB[5]);
-
-        do_data_clk_active(data);
-    };
-
     int last_bit = 0;
     // illuminate the right row for data in the shift register (the previous
     // address)
@@ -220,9 +200,9 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
         // printf("addr=%zu/%zu\n", addr, n_addr);
         for (int bit = n_planes - 1; bit >= 0; bit--) {
             // printf("bit=%d/%d\n", bit, n_planes);
-            uint32_t r = 1 << (20 + offset + bit);
-            uint32_t g = 1 << (10 + offset + bit);
-            uint32_t b = 1 << (0 + offset + bit);
+            uint32_t r_mask = 1 << (20 + offset + bit);
+            uint32_t g_mask = 1 << (10 + offset + bit);
+            uint32_t b_mask = 1 << (0 + offset + bit);
 
             // the shortest /OE we can do is one DATA_OVERHEAD...
             // TODO: should make sure desired duration of MSB is at least
@@ -233,18 +213,23 @@ void protomatter_render_rgb10(std::vector<uint32_t> &result,
             prep_data(pixels_across);
             auto mapiter = matrixmap.map.begin() + 2 * addr * pixels_across;
             for (size_t x = 0; x < pixels_across; x++) {
-                assert(mapiter != matrixmap.map.end());
-                auto pixel0 = pixels[*mapiter++];
-                auto r0 = pixel0 & r;
-                auto g0 = pixel0 & g;
-                auto b0 = pixel0 & b;
-                assert(mapiter != matrixmap.map.end());
-                auto pixel1 = pixels[*mapiter++];
-                auto r1 = pixel1 & r;
-                auto g1 = pixel1 & g;
-                auto b1 = pixel1 & b;
+                uint32_t data = addr_bits;
+                for(size_t px = 0; px < std::size(pinout::PIN_RGB) / 3; px++) {
+                    assert(mapiter != matrixmap.map.end());
+                    auto pixel0 = pixels[*mapiter++];
+                    auto r_bit = pixel0 & r_mask;
+                    auto g_bit = pixel0 & g_mask;
+                    auto b_bit = pixel0 & b_mask;
 
-                add_pixels(addr_bits, r0, g0, b0, r1, g1, b1);
+                    if(r_bit)
+                        data |= (1 << pinout::PIN_RGB[px * 3 + 0]);
+                    if(g_bit)
+                        data |= (1 << pinout::PIN_RGB[px * 3 + 1]);
+                    if(b_bit)
+                        data |= (1 << pinout::PIN_RGB[px * 3 + 2]);
+                }
+
+                do_data_clk_active(data);
             }
 
             do_data_delay(addr_bits | pinout::oe_active,
