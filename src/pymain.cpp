@@ -23,7 +23,8 @@ struct PyPiomatter {
 
 template <typename pinout, typename colorspace>
 std::unique_ptr<PyPiomatter>
-make_piomatter(py::buffer buffer, const piomatter::matrix_geometry &geometry) {
+make_piomatter_pc(py::buffer buffer,
+                  const piomatter::matrix_geometry &geometry) {
     using cls = piomatter::piomatter<pinout, colorspace>;
     using data_type = colorspace::data_type;
 
@@ -34,9 +35,11 @@ make_piomatter(py::buffer buffer, const piomatter::matrix_geometry &geometry) {
 
     if (buffer_size_in_bytes != data_size_in_bytes) {
         throw std::runtime_error(
-            py::str(
-                "Framebuffer size must be {} bytes, got a buffer of {} bytes")
-                .attr("format")(data_size_in_bytes, buffer_size_in_bytes)
+            py::str("Framebuffer size must be {} bytes ({} elements of {} "
+                    "bytes each), got a buffer of {} bytes")
+                .attr("format")(data_size_in_bytes, n_pixels,
+                                colorspace::data_size_in_bytes(1),
+                                buffer_size_in_bytes)
                 .template cast<std::string>());
     }
 
@@ -44,6 +47,52 @@ make_piomatter(py::buffer buffer, const piomatter::matrix_geometry &geometry) {
                                      data_size_in_bytes / sizeof(data_type));
     return std::make_unique<PyPiomatter>(
         buffer, std::move(std::make_unique<cls>(framebuffer, geometry)));
+}
+
+enum Colorspace { RGB565, RGB888, RGB888Packed };
+
+enum Pinout {
+    AdafruitMatrixBonnet,
+    AdafruitMatrixBonnetBGR,
+};
+
+template <class pinout>
+std::unique_ptr<PyPiomatter>
+make_piomatter_p(Colorspace c, py::buffer buffer,
+                 const piomatter::matrix_geometry &geometry) {
+    switch (c) {
+    case RGB565:
+        return make_piomatter_pc<pinout, piomatter::colorspace_rgb565>(
+            buffer, geometry);
+    case RGB888:
+        return make_piomatter_pc<pinout, piomatter::colorspace_rgb888>(
+            buffer, geometry);
+    case RGB888Packed:
+        return make_piomatter_pc<pinout, piomatter::colorspace_rgb888_packed>(
+            buffer, geometry);
+
+    default:
+        throw std::runtime_error(py::str("Invalid colorspace {!r}")
+                                     .attr("format")(c)
+                                     .template cast<std::string>());
+    }
+}
+
+std::unique_ptr<PyPiomatter>
+make_piomatter(Colorspace c, Pinout p, py::buffer buffer,
+               const piomatter::matrix_geometry &geometry) {
+    switch (p) {
+    case AdafruitMatrixBonnet:
+        return make_piomatter_p<piomatter::adafruit_matrix_bonnet_pinout>(
+            c, buffer, geometry);
+    case AdafruitMatrixBonnetBGR:
+        return make_piomatter_p<piomatter::adafruit_matrix_bonnet_pinout_bgr>(
+            c, buffer, geometry);
+    default:
+        throw std::runtime_error(py::str("Invalid pinout {!r}")
+                                     .attr("format")(p)
+                                     .template cast<std::string>());
+    }
 }
 } // namespace
 
@@ -77,6 +126,25 @@ PYBIND11_MODULE(adafruit_raspberry_pi5_piomatter, m) {
                "Rotated 90 degress counterclockwise")
         .value("CW", piomatter::orientation::cw,
                "Rotated 90 degress clockwise");
+
+    py::enum_<Pinout>(
+        m, "Pinout", "Describes the pins used for the connection to the matrix")
+        .value("AdafruitMatrixBonnet", Pinout::AdafruitMatrixBonnet,
+               "Adafruit Matrix Bonnet or Matrix Hat")
+        .value("AdafruitMatrixBonnetBGR", Pinout::AdafruitMatrixBonnetBGR,
+               "Adafruit Matrix Bonnet or Matrix Hat with BGR color order")
+        .value("AdafruitMatrixHat", Pinout::AdafruitMatrixBonnet,
+               "Adafruit Matrix Bonnet or Matrix Hat")
+        .value("AdafruitMatrixHatBGR", Pinout::AdafruitMatrixBonnet,
+               "Adafruit Matrix Bonnet or Matrix Hat with BGR color order");
+
+    py::enum_<Colorspace>(
+        m, "Colorspace",
+        "Describes the organization of the graphics data in memory")
+        .value("RGB888Packed", Colorspace::RGB888Packed,
+               "3 bytes per pixel in RGB order")
+        .value("RGB888", Colorspace::RGB888, "4 bytes per pixel in RGB order")
+        .value("RGB565", Colorspace::RGB565, "2 bytes per pixel in RGB order");
 
     py::class_<piomatter::matrix_geometry>(m, "Geometry", R"pbdoc(
 Describe the geometry of a set of panels
@@ -141,11 +209,9 @@ The default, 10, is the maximum value.
 
     py::class_<PyPiomatter>(m, "PioMatter", R"pbdoc(
 HUB75 matrix driver for Raspberry Pi 5 using PIO
-
-Do not create instances of this class directly. Instead, use one of
-the constructors such as `AdafruitMatrixBonnetRGB888Packed` to
-select a specific pinout & in-memory framebuffer layout.
 )pbdoc")
+        .def(py::init(&make_piomatter), py::arg("colorspace"),
+             py::arg("pinout"), py::arg("framebuffer"), py::arg("geometry"))
         .def("show", &PyPiomatter::show, R"pbdoc(
 Update the displayed image
 
@@ -157,33 +223,53 @@ data is triple-buffered to prevent tearing.
 The approximate number of matrix refreshes per second.
 )pbdoc");
 
-    m.def("AdafruitMatrixBonnetRGB565",
-          make_piomatter<piomatter::adafruit_matrix_bonnet_pinout,
-                         piomatter::colorspace_rgb565>,
-          py::arg("buffer"), py::arg("geometry"))
-        //.doc() = "Drive panels connected to an Adafruit Matrix Bonnet using
-        // the RGB565 memory layout (4 bytes per pixel)"
-        ;
+    m.def(
+        "AdafruitMatrixBonnetRGB565",
+        [](py::buffer buffer, const piomatter::matrix_geometry &geometry) {
+            return make_piomatter(Colorspace::RGB565,
+                                  Pinout::AdafruitMatrixBonnet, buffer,
+                                  geometry);
+        },
+        py::arg("buffer"), py::arg("geometry"),
+        R"pbdoc(
+Construct a PioMatter object to drive panels connected to an
+Adafruit Matrix Bonnet using the RGB565 memory layout (2 bytes per
+pixel)
 
-    m.def("AdafruitMatrixBonnetRGB888",
-          make_piomatter<piomatter::adafruit_matrix_bonnet_pinout,
-                         piomatter::colorspace_rgb888>,
-          py::arg("framebuffer"), py::arg("geometry"),
-          R"pbdoc(
+This is deprecated shorthand for `PioMatter(Colorspace.RGB565, Pinout.AdafruitMatrixBonnet, ...)`.
+)pbdoc");
+
+    m.def(
+        "AdafruitMatrixBonnetRGB888",
+        [](py::buffer buffer, const piomatter::matrix_geometry &geometry) {
+            return make_piomatter(Colorspace::RGB888,
+                                  Pinout::AdafruitMatrixBonnet, buffer,
+                                  geometry);
+        },
+        py::arg("framebuffer"), py::arg("geometry"),
+        R"pbdoc(
 Construct a PioMatter object to drive panels connected to an
 Adafruit Matrix Bonnet using the RGB888 memory layout (4 bytes per
 pixel)
+
+This is deprecated shorthand for `PioMatter(Colorspace.RGB888, Pinout.AdafruitMatrixBonnet, ...)`.
 )pbdoc")
         //.doc() =
         ;
 
-    m.def("AdafruitMatrixBonnetRGB888Packed",
-          make_piomatter<piomatter::adafruit_matrix_bonnet_pinout,
-                         piomatter::colorspace_rgb888_packed>,
-          py::arg("framebuffer"), py::arg("geometry"),
-          R"pbdoc(
+    m.def(
+        "AdafruitMatrixBonnetRGB888Packed",
+        [](py::buffer buffer, const piomatter::matrix_geometry &geometry) {
+            return make_piomatter(Colorspace::RGB888Packed,
+                                  Pinout::AdafruitMatrixBonnet, buffer,
+                                  geometry);
+        },
+        py::arg("framebuffer"), py::arg("geometry"),
+        R"pbdoc(
 Construct a PioMatter object to drive panels connected to an
 Adafruit Matrix Bonnet using the RGB888 packed memory layout (3
 bytes per pixel)
+
+This is deprecated shorthand for `PioMatter(Colorspace.RGB888Packed, Pinout.AdafruitMatrixBonnet, ...)`.
 )pbdoc");
 }

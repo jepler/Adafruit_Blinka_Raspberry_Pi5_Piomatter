@@ -1,59 +1,21 @@
 #!/usr/bin/python3
 """
-Mirror a scaled copy of the framebuffer to a 64x32 matrix
+Mirror a scaled copy of the framebuffer to a matrix
 
-The upper left corner of the framebuffer is displayed until the user hits ctrl-c.
-
-Control matrix size, and orientation with command line arguments.
-
-python fbmirror_scaled.py [width] [height] [orientation]
-
-    width int: Total width of matrices in pixels. Default is 64.
-    height int: Total height of matrices in pixels. Default is 32.
-    orientation int: Orientation in degrees, must be 0, 90, 180, or 270.
-        Default is 0 or Normal orientation.
+A portion of the framebuffer is displayed until the user hits ctrl-c.
 
 The `/dev/fb0` special file will exist if a monitor is plugged in at boot time,
 or if `/boot/firmware/cmdline.txt` specifies a resolution such as
 `...  video=HDMI-A-1:640x480M@60D`.
+
+For help with commandline arguments, run `python fbmirror.py --help`
 """
 
-import sys
 
-import adafruit_raspberry_pi5_piomatter
+import adafruit_raspberry_pi5_piomatter as piomatter
+import click
 import numpy as np
-
-width = 64
-height = 32
-
-yoffset = 0
-xoffset = 0
-
-
-if len(sys.argv) >= 2:
-    width = int(sys.argv[1])
-else:
-    width = 64
-
-if len(sys.argv) >= 3:
-    height = int(sys.argv[2])
-else:
-    height = 32
-
-if len(sys.argv) >= 4:
-    rotation = int(sys.argv[3])
-    if rotation == 90:
-        rotation = adafruit_raspberry_pi5_piomatter.Orientation.CW
-    elif rotation == 180:
-        rotation = adafruit_raspberry_pi5_piomatter.Orientation.R180
-    elif rotation == 270:
-        rotation = adafruit_raspberry_pi5_piomatter.Orientation.CCW
-    elif rotation == 0:
-        rotation = adafruit_raspberry_pi5_piomatter.Orientation.Normal
-    else:
-        raise ValueError("Invalid rotation. Must be 0, 90, 180, or 270.")
-else:
-    rotation = adafruit_raspberry_pi5_piomatter.Orientation.Normal
+import piomatter_click
 
 with open("/sys/class/graphics/fb0/virtual_size") as f:
     screenx, screeny = [int(word) for word in f.read().split(",")]
@@ -71,11 +33,18 @@ with open("/sys/class/graphics/fb0/stride") as f:
 
 linux_framebuffer = np.memmap('/dev/fb0',mode='r', shape=(screeny, stride // bytes_per_pixel), dtype=dtype)
 
+@click.command
+@click.option("--x-offset", "xoffset", type=int, help="The x offset of top left corner of the region to mirror")
+@click.option("--y-offset", "yoffset", type=int, help="The y offset of top left corner of the region to mirror")
+@piomatter_click.standard_options
+def main(xoffset, yoffset, width, height, serpentine, rotation, colorspace, pinout, n_planes, n_addr_lines):
+    geometry = piomatter.Geometry(width=width, height=height, n_planes=n_planes, n_addr_lines=n_addr_lines, rotation=rotation)
+    framebuffer = np.zeros(shape=(geometry.height, geometry.width), dtype=dtype)
+    matrix = piomatter.PioMatter(colorspace=colorspace, pinout=pinout, framebuffer=framebuffer, geometry=geometry)
 
-geometry = adafruit_raspberry_pi5_piomatter.Geometry(width=width, height=height, n_addr_lines=4, rotation=rotation)
-matrix_framebuffer = np.zeros(shape=(geometry.height, geometry.width), dtype=dtype)
-matrix = adafruit_raspberry_pi5_piomatter.AdafruitMatrixBonnetRGB565(matrix_framebuffer, geometry)
+    while True:
+        framebuffer[:,:] = linux_framebuffer[yoffset:yoffset+height, xoffset:xoffset+width]
+        matrix.show()
 
-while True:
-    matrix_framebuffer[:,:] = linux_framebuffer[yoffset:yoffset+height, xoffset:xoffset+width]
-    matrix.show()
+if __name__ == '__main__':
+    main()
