@@ -11,7 +11,7 @@ The animated gif is played repeatedly until interrupted with ctrl-c.
 
 import time
 
-import adafruit_raspberry_pi5_piomatter
+import adafruit_raspberry_pi5_piomatter as piomatter
 import numpy as np
 import PIL.Image as Image
 
@@ -21,9 +21,13 @@ height = 32
 gif_file = "nyan.gif"
 
 canvas = Image.new('RGB', (width, height), (0, 0, 0))
-geometry = adafruit_raspberry_pi5_piomatter.Geometry(width=width, height=height, n_addr_lines=4, rotation=adafruit_raspberry_pi5_piomatter.Orientation.Normal)
+geometry = piomatter.Geometry(width=width, height=height,
+                              n_addr_lines=4, rotation=piomatter.Orientation.Normal)
 framebuffer = np.asarray(canvas) + 0  # Make a mutable copy
-matrix = adafruit_raspberry_pi5_piomatter.AdafruitMatrixBonnetRGB888Packed(framebuffer, geometry)
+matrix = piomatter.PioMatter(colorspace=piomatter.Colorspace.RGB888Packed,
+                             pinout=piomatter.Pinout.AdafruitMatrixBonnet,
+                             framebuffer=framebuffer,
+                             geometry=geometry)
 
 with Image.open(gif_file) as img:
     print(f"frames: {img.n_frames}")

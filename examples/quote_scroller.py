@@ -14,7 +14,7 @@ $ python quote_scroller.py
 
 """
 
-import adafruit_raspberry_pi5_piomatter
+import adafruit_raspberry_pi5_piomatter as piomatter
 import numpy as np
 import requests
 from PIL import Image, ImageDraw, ImageFont
@@ -44,10 +44,14 @@ full_txt_img.save("quote.png")
 
 single_frame_img = Image.new("RGB", (total_width, total_height), (0, 0, 0))
 
-geometry = adafruit_raspberry_pi5_piomatter.Geometry(width=total_width, height=total_height, n_addr_lines=4, rotation=adafruit_raspberry_pi5_piomatter.Orientation.Normal)
+geometry = piomatter.Geometry(width=total_width, height=total_height,
+                              n_addr_lines=4, rotation=piomatter.Orientation.Normal)
 framebuffer = np.asarray(single_frame_img) + 0  # Make a mutable copy
 
-matrix = adafruit_raspberry_pi5_piomatter.AdafruitMatrixBonnetRGB888Packed(framebuffer, geometry)
+matrix = piomatter.PioMatter(colorspace=piomatter.Colorspace.RGB888Packed,
+                             pinout=piomatter.Pinout.AdafruitMatrixBonnet,
+                             framebuffer=framebuffer,
+                             geometry=geometry)
 
 print("Ctrl-C to exit")
 while True:

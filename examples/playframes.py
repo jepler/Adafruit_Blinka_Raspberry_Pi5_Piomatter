@@ -13,16 +13,19 @@ import glob
 import sys
 import time
 
-import adafruit_raspberry_pi5_piomatter
+import adafruit_raspberry_pi5_piomatter as piomatter
 import numpy as np
 import PIL.Image as Image
 
 images = sorted(glob.glob(sys.argv[1]))
 
-geometry = adafruit_raspberry_pi5_piomatter.Geometry(width=64, height=32, n_addr_lines=4, rotation=adafruit_raspberry_pi5_piomatter.Orientation.Normal)
+geometry = piomatter.Geometry(width=64, height=32, n_addr_lines=4, rotation=piomatter.Orientation.Normal)
 framebuffer = np.asarray(Image.open(images[0])) + 0  # Make a mutable copy
 nimages = len(images)
-matrix = adafruit_raspberry_pi5_piomatter.AdafruitMatrixBonnetRGB888Packed(framebuffer, geometry)
+matrix = piomatter.PioMatter(colorspace=piomatter.Colorspace.RGB888Packed,
+                             pinout=piomatter.Pinout.AdafruitMatrixBonnet,
+                             framebuffer=framebuffer,
+                             geometry=geometry)
 
 while True:
     t0 = time.monotonic()
