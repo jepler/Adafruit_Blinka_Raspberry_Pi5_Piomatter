@@ -32,7 +32,6 @@ def standard_options(
     height=32,
     serpentine=True,
     rotation=piomatter.Orientation.Normal,
-    colorspace=piomatter.Colorspace.RGB888,
     pinout=piomatter.Pinout.AdafruitMatrixBonnet,
     n_planes=10,
     n_addr_lines=4,
@@ -58,13 +57,6 @@ def standard_options(
             f = click.option("--height", default=height, help="The panel height in pixels")(f)
         if serpentine is not None:
             f = click.option("--serpentine/--no-serpentine", default=serpentine, help="The organization of multiple panels")(f)
-        if colorspace is not None:
-            f = click.option(
-                "--colorspace",
-                default=colorspace,
-                type=PybindEnumChoice(piomatter.Colorspace),
-                help="The memory organization of the framebuffer"
-            )(f)
         if pinout is not None:
             f = click.option(
                 "--pinout",

@@ -112,6 +112,8 @@ PYBIND11_MODULE(adafruit_raspberry_pi5_piomatter, m) {
            :toctree: _generate
 
            Orientation
+           Pinout
+           Colorspace
            Geometry
            PioMatter
            AdafruitMatrixBonnetRGB888
