@@ -214,6 +214,19 @@ The default, 10, is the maximum value.
 
     py::class_<PyPiomatter>(m, "PioMatter", R"pbdoc(
 HUB75 matrix driver for Raspberry Pi 5 using PIO
+
+``colorspace`` controls the colorspace that will be used for data to be displayed.
+It must be one of the ``Colorspace`` constants. Which to use depends on what data
+your displaying and how it is processed before copying into the framebuffer.
+
+``pinout`` defines which pins the panels are wired to. Different pinouts can
+support different hardware breakouts and panels with different color order. The
+value must be one of the ``Pinout`` constants.
+
+``framebuffer`` a numpy array that holds pixel data in the appropriate colorspace.
+
+``geometry`` controls the size and shape of the panel. The value must be a ``Geometry``
+instance.
 )pbdoc")
         .def(py::init(&make_piomatter), py::arg("colorspace"),
              py::arg("pinout"), py::arg("framebuffer"), py::arg("geometry"))
