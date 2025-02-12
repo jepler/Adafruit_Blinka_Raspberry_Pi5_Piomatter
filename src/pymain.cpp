@@ -160,6 +160,9 @@ The number of pixels in the shift register is automatically computed from these 
 ``serpentine`` controls the arrangement of multiple panels when they are stacked in rows.
 If it is `True`, then each row goes in the opposite direction of the previous row.
 
+``rotation`` controls the orientation of the panel(s). Must be one of the ``Orientation``
+constants. Default is ``Orientation.Normal``.
+
 ``n_planes`` controls the color depth of the panel. This is separate from the framebuffer
 layout. Decreasing ``n_planes`` can increase FPS at the cost of reduced color fidelity.
 The default, 10, is the maximum value.
