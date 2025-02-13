@@ -6,4 +6,4 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   adafruit_raspberry_pi5_piomatter
+   adafruit_blinka_raspberry_pi5_piomatter

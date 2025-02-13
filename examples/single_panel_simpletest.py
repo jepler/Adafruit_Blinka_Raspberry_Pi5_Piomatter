@@ -11,7 +11,7 @@ $ python simpletest.py
 
 """
 
-import adafruit_raspberry_pi5_piomatter as piomatter
+import adafruit_blinka_raspberry_pi5_piomatter as piomatter
 import numpy as np
 from PIL import Image, ImageDraw
 
