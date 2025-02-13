@@ -11,7 +11,7 @@ __version__ = get_version()
 #   say from a submodule.
 
 ext_modules = [
-    Pybind11Extension("adafruit_raspberry_pi5_piomatter",
+    Pybind11Extension("adafruit_blinka_raspberry_pi5_piomatter",
         ["src/pymain.cpp", "src/piolib/piolib.c", "src/piolib/pio_rp1.c"],
         define_macros = [('VERSION_INFO', __version__)],
         include_dirs = ['./src/include', './src/piolib/include'],

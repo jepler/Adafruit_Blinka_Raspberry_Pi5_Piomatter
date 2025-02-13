@@ -10,7 +10,7 @@ Run like this:
 $ python rainbow_spiral.py
 
 """
-import adafruit_raspberry_pi5_piomatter as piomatter
+import adafruit_blinka_raspberry_pi5_piomatter as piomatter
 import numpy as np
 import rainbowio
 from PIL import Image, ImageDraw

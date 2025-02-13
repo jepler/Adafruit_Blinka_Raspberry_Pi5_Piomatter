@@ -13,7 +13,7 @@ import glob
 import sys
 import time
 
-import adafruit_raspberry_pi5_piomatter as piomatter
+import adafruit_blinka_raspberry_pi5_piomatter as piomatter
 import numpy as np
 import PIL.Image as Image
 

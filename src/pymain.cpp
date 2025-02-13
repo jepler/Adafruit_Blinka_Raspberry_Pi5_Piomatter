@@ -96,7 +96,7 @@ make_piomatter(Colorspace c, Pinout p, py::buffer buffer,
 }
 } // namespace
 
-PYBIND11_MODULE(adafruit_raspberry_pi5_piomatter, m) {
+PYBIND11_MODULE(adafruit_blinka_raspberry_pi5_piomatter, m) {
     py::options options;
     options.enable_enum_members_docstring();
     options.enable_function_signatures();
@@ -106,7 +106,7 @@ PYBIND11_MODULE(adafruit_raspberry_pi5_piomatter, m) {
         HUB75 matrix driver for Raspberry Pi 5 using PIO
         ------------------------------------------------
 
-        .. currentmodule:: adafruit_raspberry_pi5_piomatter
+        .. currentmodule:: adafruit_blinka_raspberry_pi5_piomatter
 
         .. autosummary::
            :toctree: _generate

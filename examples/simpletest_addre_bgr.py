@@ -13,7 +13,7 @@ The image is displayed until the user hits enter to exit.
 
 import pathlib
 
-import adafruit_raspberry_pi5_piomatter as piomatter
+import adafruit_blinka_raspberry_pi5_piomatter as piomatter
 import numpy as np
 import PIL.Image as Image
 

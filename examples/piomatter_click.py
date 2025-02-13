@@ -5,7 +5,7 @@
 from collections.abc import Callable
 from typing import Any
 
-import adafruit_raspberry_pi5_piomatter as piomatter
+import adafruit_blinka_raspberry_pi5_piomatter as piomatter
 import click
 
 
