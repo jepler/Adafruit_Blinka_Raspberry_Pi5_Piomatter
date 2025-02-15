@@ -160,6 +160,9 @@ The number of pixels in the shift register is automatically computed from these 
 ``serpentine`` controls the arrangement of multiple panels when they are stacked in rows.
 If it is `True`, then each row goes in the opposite direction of the previous row.
 
+``rotation`` controls the orientation of the panel(s). Must be one of the ``Orientation``
+constants. Default is ``Orientation.Normal``.
+
 ``n_planes`` controls the color depth of the panel. This is separate from the framebuffer
 layout. Decreasing ``n_planes`` can increase FPS at the cost of reduced color fidelity.
 The default, 10, is the maximum value.
@@ -211,6 +214,19 @@ The default, 10, is the maximum value.
 
     py::class_<PyPiomatter>(m, "PioMatter", R"pbdoc(
 HUB75 matrix driver for Raspberry Pi 5 using PIO
+
+``colorspace`` controls the colorspace that will be used for data to be displayed.
+It must be one of the ``Colorspace`` constants. Which to use depends on what data
+your displaying and how it is processed before copying into the framebuffer.
+
+``pinout`` defines which pins the panels are wired to. Different pinouts can
+support different hardware breakouts and panels with different color order. The
+value must be one of the ``Pinout`` constants.
+
+``framebuffer`` a numpy array that holds pixel data in the appropriate colorspace.
+
+``geometry`` controls the size and shape of the panel. The value must be a ``Geometry``
+instance.
 )pbdoc")
         .def(py::init(&make_piomatter), py::arg("colorspace"),
              py::arg("pinout"), py::arg("framebuffer"), py::arg("geometry"))
