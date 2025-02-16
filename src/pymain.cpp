@@ -96,7 +96,7 @@ make_piomatter(Colorspace c, Pinout p, py::buffer buffer,
 }
 } // namespace
 
-PYBIND11_MODULE(adafruit_blinka_raspberry_pi5_piomatter, m) {
+PYBIND11_MODULE(_piomatter, m) {
     py::options options;
     options.enable_enum_members_docstring();
     options.enable_function_signatures();

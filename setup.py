@@ -11,7 +11,7 @@ __version__ = get_version()
 #   say from a submodule.
 
 ext_modules = [
-    Pybind11Extension("adafruit_blinka_raspberry_pi5_piomatter",
+    Pybind11Extension("adafruit_blinka_raspberry_pi5_piomatter._piomatter",
         ["src/pymain.cpp", "src/piolib/piolib.c", "src/piolib/pio_rp1.c"],
         define_macros = [('VERSION_INFO', __version__)],
         include_dirs = ['./src/include', './src/piolib/include'],
@@ -33,6 +33,8 @@ setup(
     cmdclass={"build_ext": build_ext},
     zip_safe=False,
     python_requires=">=3.11",
+    packages=['adafruit_blinka_raspberry_pi5_piomatter'],
+    package_dir={'adafruit_blinka_raspberry_pi5_piomatter': 'src/adafruit_blinka_raspberry_pi5_piomatter'},
     extras_require={
         'docs': ["sphinx", "sphinx-rtd-theme", "sphinxcontrib-jquery"],
     },
