@@ -209,6 +209,20 @@ The default, 10, is the maximum value.
              py::arg("serpentine") = true,
              py::arg("rotation") = piomatter::orientation::normal,
              py::arg("n_planes") = 10u)
+        .def(py::init([](size_t width, size_t height, size_t n_addr_lines,
+                         piomatter::matrix_map map, size_t n_planes) {
+                 size_t n_lines = 2 << n_addr_lines;
+                 size_t pixels_across = width * height / n_lines;
+                 for (auto el : map) {
+                     if ((size_t)el >= width * height) {
+                         throw std::out_of_range("Map element out of range");
+                     }
+                 }
+                 return piomatter::matrix_geometry(
+                     pixels_across, n_addr_lines, n_planes, width, height, map);
+             }),
+             py::arg("width"), py::arg("height"), py::arg("n_addr_lines"),
+             py::arg("map"), py::arg("n_planes") = 10u)
         .def_readonly("width", &piomatter::matrix_geometry::width)
         .def_readonly("height", &piomatter::matrix_geometry::height);
 

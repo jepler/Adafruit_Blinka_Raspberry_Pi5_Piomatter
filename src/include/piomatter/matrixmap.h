@@ -84,16 +84,21 @@ struct matrix_geometry {
     template <typename Cb>
     matrix_geometry(size_t pixels_across, size_t n_addr_lines, int n_planes,
                     size_t width, size_t height, bool serpentine, const Cb &cb)
+        : matrix_geometry(
+              pixels_across, n_addr_lines, n_planes, width, height,
+              make_matrixmap(width, height, n_addr_lines, serpentine, cb)) {}
+
+    matrix_geometry(size_t pixels_across, size_t n_addr_lines, int n_planes,
+                    size_t width, size_t height, matrix_map map)
         : pixels_across(pixels_across), n_addr_lines(n_addr_lines),
-          n_planes(n_planes), width(width),
-          height(height), map{make_matrixmap(width, height, n_addr_lines,
-                                             serpentine, cb)} {
+          n_planes(n_planes), width(width), height(height), map(map) {
         size_t pixels_down = 2u << n_addr_lines;
         if (map.size() != pixels_down * pixels_across) {
             throw std::range_error(
                 "map size does not match calculated pixel count");
         }
     }
+
     size_t pixels_across, n_addr_lines;
     int n_planes;
     size_t width, height;
