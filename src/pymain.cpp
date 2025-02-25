@@ -137,7 +137,7 @@ PYBIND11_MODULE(adafruit_blinka_raspberry_pi5_piomatter, m) {
                "Adafruit Matrix Bonnet or Matrix Hat with BGR color order")
         .value("AdafruitMatrixHat", Pinout::AdafruitMatrixBonnet,
                "Adafruit Matrix Bonnet or Matrix Hat")
-        .value("AdafruitMatrixHatBGR", Pinout::AdafruitMatrixBonnet,
+        .value("AdafruitMatrixHatBGR", Pinout::AdafruitMatrixBonnetBGR,
                "Adafruit Matrix Bonnet or Matrix Hat with BGR color order");
 
     py::enum_<Colorspace>(
