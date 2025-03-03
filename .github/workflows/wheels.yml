@@ -50,7 +50,7 @@ jobs:
         submodules: true
         fetch-depth: 0
 
-    - uses: pypa/cibuildwheel@v2.22.0
+    - uses: pypa/cibuildwheel@v2.23.0
       env:
         CIBW_ARCHS_LINUX: ${{ matrix.arch_linux }}
         CIBW_BUILD: "cp311-manylinux* cp312-manylinux* cp313-manylinux*"
